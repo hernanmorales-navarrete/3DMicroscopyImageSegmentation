@@ -103,6 +103,6 @@ class AttentionUNet3D:
         decoder2 = Decoder(128)(encoder2, decoder3)
         decoder1 = Decoder(64)(encoder1, decoder2)
 
-        final_conv = Conv3D(1, 1)(decoder1)
+        final_conv = Conv3D(1, 1, activation='sigmoid')(decoder1)
 
         return Model(input, final_conv)
