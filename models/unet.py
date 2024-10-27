@@ -34,4 +34,4 @@ class UNet3D:
 
         output = Conv3D(1, 1, activation='sigmoid')(decoder1)
 
-        return Model([x], output)
+        return Model(x, output)
