@@ -1,4 +1,7 @@
 import math
+import tensorflow as tf
+from datetime import datetime
+import os
 
 def train_model(
     train_dataset,
@@ -9,8 +12,23 @@ def train_model(
     metrics,
     epochs,
     batch_size, 
-    filename
+    filename, 
+    model_name, 
+    log_dir='logs'
 ): 
+    
+    log_dir = os.path.join(log_dir, model_name, datetime.now().strftime("%Y%m%d-%H%M%S"))
+    
+    early_stopping = tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        patience=10,
+    )
+    
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=log_dir,
+        histogram_freq=1
+    )
+    
     model.compile(
         optimizer=optimizer, 
         loss=loss, 
@@ -22,7 +40,8 @@ def train_model(
         y = train_dataset[1],
         validation_data = (val_dataset[0], val_dataset[1]),
         epochs = epochs,
-        batch_size=batch_size
+        batch_size=batch_size,
+        callbacks=[early_stopping, tensorboard_callback]
     )
     
     model.save(filename)
