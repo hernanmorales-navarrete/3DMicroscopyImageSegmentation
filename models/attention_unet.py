@@ -2,8 +2,8 @@ from tensorflow.keras import Model, Layer
 from tensorflow.keras.layers import Conv3D, ReLU, MaxPool3D, UpSampling3D, Input, Concatenate, GroupNormalization, Conv3DTranspose, GlobalAveragePooling3D, Dense, Reshape, Activation, Dot, Add, Multiply
 
 class DoubleConv(Layer):
-    def __init__(self, out_channels): 
-        super().__init__()
+    def __init__(self, out_channels, **kwargs): 
+        super().__init__(**kwargs)
         self.out_channels = out_channels
         self.conv1 = Conv3D(self.out_channels, kernel_size=3, padding='same')
         self.conv2 = Conv3D(self.out_channels, kernel_size=3, padding='same')
@@ -21,12 +21,15 @@ class DoubleConv(Layer):
         return x
 
 class Encoder(Layer):
-    def __init__(self, maxpool, out_channels): 
-        super().__init__()
+    def __init__(self, maxpool, out_channels, **kwargs): 
+        super().__init__(**kwargs)
         self.ismaxpool = maxpool
         self.out_channels = out_channels
         self.maxpool = MaxPool3D(2, padding='same')
         self.doubleconv = DoubleConv(self.out_channels)
+    
+    def build(self, input_shape):
+        super().build(input_shape)
     
     def call(self, inputs):
         if self.ismaxpool: 
@@ -39,12 +42,15 @@ class Encoder(Layer):
         return x
 
 class Decoder(Layer):
-    def __init__(self, out_channels):
-        super().__init__()
+    def __init__(self, out_channels, **kwargs):
+        super().__init__(**kwargs)
         self.out_channels = out_channels
         self.convtrans = Conv3DTranspose(self.out_channels, 2, 2)
         self.attention = Attention(1024, self.out_channels)
         self.doubleconv = DoubleConv(self.out_channels)
+        
+    def build(self, input_shape):
+        super().build(input_shape)
     
     def call(self, encoder_input, inputs):
         x = self.convtrans(inputs)
@@ -56,8 +62,8 @@ class Decoder(Layer):
 
         
 class Attention(Layer): 
-    def __init__(self, latent_size, channels):
-        super().__init__()
+    def __init__(self, latent_size, channels, **kwargs):
+        super().__init__(**kwargs)
         self.latent_size = latent_size
         self.channels = channels
 
@@ -69,6 +75,9 @@ class Attention(Layer):
         self.multiply = Multiply()
         self.conv = Conv3D(1, 1)
         self.add = Add()
+    
+    def build(self, input_shape):
+        super().build(input_shape)
         
     def call(self, inputs):
         #Channel Attention Mechanism
@@ -86,7 +95,6 @@ class Attention(Layer):
 
         #Sum 
         return self.add([inputs + channel_attention + spatial_attention])
-    
 
 class AttentionUNet3D:
     def build_model(self, input_shape=(64, 64, 64, 1)):
