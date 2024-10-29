@@ -29,6 +29,13 @@ def train_model(
         histogram_freq=1
     )
     
+    model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        model_name +'.keras',
+        monitor='val_loss',
+        save_best_only=True,
+        mode='min'
+    )
+    
     model.compile(
         optimizer=optimizer, 
         loss=loss, 
@@ -41,10 +48,8 @@ def train_model(
         validation_data = (val_dataset[0], val_dataset[1]),
         epochs = epochs,
         batch_size=batch_size,
-        callbacks=[early_stopping, tensorboard_callback]
+        callbacks=[early_stopping, tensorboard_callback, model_checkpoint]
     )
-    
-    model.save(filename)
     
     
     
