@@ -54,3 +54,6 @@ data/
 
 # Jupyter Checkpoints
 .ipynb_checkpoints/
+
+# Logs
+logs/
