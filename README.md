@@ -133,6 +133,24 @@ The parameters are:
 - filename: name of the saved model. The function always saved the best model. 
 - model_name: name to be displaye in Tensorboard
 
+If you want to train the model with different GPUs, use strategy.scope() as scope for the function. 
+
+```
+with strategy.scope():
+    train_model(
+        train_dataset = train_dataset, 
+        val_dataset = val_dataset, 
+        model = UNet3D().build_model(), 
+        optimizer = 'adam', 
+        loss = 'binary_crossentropy',
+        metrics=['accuracy', 'precision', 'recall'],
+        epochs = 50,
+        batch_size = 16, 
+        filename="bc_unet3d.keras",
+        model_name="bc_unet3d"
+    )
+```
+
 ### Predict
 
 
