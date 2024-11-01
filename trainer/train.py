@@ -30,7 +30,7 @@ def train_model(
     )
     
     model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
-        model_name +'.keras',
+        "saved_models/"+ model_name +'.keras',
         monitor='val_loss',
         save_best_only=True,
         mode='min'
