@@ -13,8 +13,9 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, orig
         
         # Calculate the number of rows needed for 3 columns
         num_plots = num_models + 2
+        num_rows = math.ceil(num_plots / 3)
         
-        fig, axes = plt.subplots(num_plots, 1, figsize=(18, 6 * num_plots))
+        fig, axes = plt.subplots(num_rows, 3, figsize=(18, 6 * num_plots))
         
         img_reshaped = images[image_index].reshape(patches_size[image_index])
         mask_reshaped = masks[image_index].reshape(patches_size[image_index])
@@ -22,22 +23,34 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, orig
         img = unpatchify(img_reshaped, original_sizes[image_index])[:, :, z]
         mask = unpatchify(mask_reshaped, original_sizes[image_index])[:, :, z]
         
+        if np.shape(img)[0] < np.shape(img)[1]:
+            img = np.transpose(img)
+            mask= np.transpose(mask)
+        
+        axes[0, 0].imshow(img, cmap='gray')
+        axes[0, 0].axis('off')
+        axes[0, 0].set_title('Image')
 
-        axes[0].imshow(img, cmap='gray')
-        axes[0].axis('off')
-        axes[0].set_title('Image')
-
-        axes[1].imshow(mask, cmap='gray')
-        axes[1].axis('off')
-        axes[1].set_title('Ground Truth Mask')
+        axes[0, 1].imshow(mask, cmap='gray')
+        axes[0, 1].axis('off')
+        axes[0, 1].set_title('Ground Truth Mask')
 
         for i in range(num_models):
+            row = (i + 2) // 3
+            col = (i + 2) % 3
             predictions_and_its_masks = create_array_patches_per_image(predictions[i], patches_per_image)
             pred_reshaped = predictions_and_its_masks[image_index].reshape(patches_size[image_index])
             pred = unpatchify(pred_reshaped, original_sizes[image_index])[:, :, z]
-            axes[i + 2].imshow(pred, cmap='gray')
-            axes[i + 2].axis('off')
-            axes[i + 2].set_title(model_names[i] + " Prediction")
+            
+            if pred.shape[0] < pred.shape[1]: 
+                pred = np.transpose(pred, (1, 0))
+            axes[row, col].imshow(binarize_predictions(pred), cmap='gray')
+            axes[row, col].axis('off')
+            axes[row, col].set_title(model_names[i] + " Prediction")
+        
+        # Hide any unused subplots
+        for ax in axes[num_plots:]:
+            ax.axis('off')
             
         plt.tight_layout()
         plt.show()
@@ -79,7 +92,7 @@ def visualize_patches_3D_in_2D(dataset, predictions, model_names, patch_idx, z):
     for i in range(num_models):
         row = (i + 2) // 3
         col = (i + 2) % 3
-        pred_2D = predictions[i][patch_idx][:, :, z]
+        pred_2D = binarize_predictions(predictions[i][patch_idx][:, :, z])
         axes[row, col].imshow(pred_2D, cmap='gray')
         axes[row, col].axis('off')
         axes[row, col].set_title(model_names[i] + " Prediction")
