@@ -70,7 +70,7 @@ def inference(
         continuous_update=False
     )
     
-    interact(visualize_reconstructed_images, images=fixed(img_patches_matrix), masks=fixed(mask_patches_matrix), predictions=fixed(predictions), model_names=fixed(model_names), nonreshaped_patches_arr_sizes=fixed(reconstruction_info[2]), reshaped_patches_arr_sizes=fixed(reconstruction_info[3]), nonpadded_image_sizes=fixed(reconstruction_info[0]), padded_image_sizes=fixed(reconstruction_info[1]), dataset_name=dataset_name, image_index=image_slider)
+    interact(visualize_reconstructed_images, images=fixed(img_patches_matrix), masks=fixed(mask_patches_matrix), predictions=fixed(predictions), model_names=fixed(model_names), nonreshaped_patches_arr_sizes=fixed(reconstruction_info[2]), reshaped_patches_arr_sizes=fixed(reconstruction_info[3]), nonpadded_image_sizes=fixed(reconstruction_info[0]), padded_image_sizes=fixed(reconstruction_info[1]), dataset_name=fixed(dataset_name), image_index=image_slider)
     
     plot_violin(predictions, dataset[1], model_names, violin_plot_filename)
 
