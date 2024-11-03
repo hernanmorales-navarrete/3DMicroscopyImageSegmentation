@@ -61,7 +61,9 @@ def plot_violin(predictions, ground_truth, model_names, filename):
         plt.subplot(len(metrics), 1, i + 1)
         sns.violinplot(x='Model', y='Value', data=df[df['Metric'] == metric])
         plt.title(metric)
-        plt.ylim(0.0, 1.0)
+        # Dynamically set the y-axis limit
+        y_min = max(df[df['Metric'] == metric]['Value'].min() - 0.1, 0)
+        plt.ylim(y_min, 1.1)
 
     plt.tight_layout()
     plt.savefig(filename + ".svg")
