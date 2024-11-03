@@ -1,5 +1,6 @@
 from tensorflow.keras.models import load_model
-from data_loader.reconstruct_dataset import create_dataset_inference, create_array_patches_per_image
+from data_loader.reconstruct_dataset import create_dataset_inference, create_matrix_images_as_rows_patches_as_cols
+
 from utils.data_viz import visualize_patches_3D_in_2D, visualize_reconstructed_images
 from ipywidgets import IntSlider, interact, fixed
 from utils.metrics import plot_violin
@@ -22,10 +23,11 @@ def inference(
     model_paths, 
     model_names,
     violin_plot_filename,
+    dataset_name,
     patch_shape,
     patch_step,
 ): 
-    dataset, reconstruction_info = create_dataset_inference(
+    all_images_names, dataset, reconstruction_info = create_dataset_inference(
         test_dir,
         patch_shape=patch_shape, 
         patch_step=patch_step,
@@ -55,21 +57,20 @@ def inference(
     )
     
     interact(visualize_patches_3D_in_2D, dataset=fixed(dataset), predictions=fixed(predictions), model_names=fixed(model_names), patch_idx=patch_slider, z=z_slider)
-
     
-    images_and_its_patches = create_array_patches_per_image(dataset[0], reconstruction_info[2])
-    masks_and_its_patches = create_array_patches_per_image(dataset[1], reconstruction_info[2])
+    img_patches_matrix = create_matrix_images_as_rows_patches_as_cols(dataset[0], reconstruction_info[3])
+    mask_patches_matrix = create_matrix_images_as_rows_patches_as_cols(dataset[1], reconstruction_info[3])
         
     image_slider = IntSlider(
         value=0,
         min=0,
-        max= len(images_and_its_patches) - 1,
+        max= len(img_patches_matrix) - 1,
         step=1,
         description='Current Image: ',
         continuous_update=False
     )
     
-    interact(visualize_reconstructed_images, images=fixed(images_and_its_patches), masks=fixed(masks_and_its_patches), predictions=fixed(predictions), model_names=fixed(model_names), original_sizes=fixed(reconstruction_info[0]), patches_size=fixed(reconstruction_info[1]), patches_per_image=fixed(reconstruction_info[2]), image_index=image_slider)
+    interact(visualize_reconstructed_images, images=fixed(img_patches_matrix), masks=fixed(mask_patches_matrix), predictions=fixed(predictions), model_names=fixed(model_names), nonreshaped_patches_arr_sizes=fixed(reconstruction_info[2]), reshaped_patches_arr_sizes=fixed(reconstruction_info[3]), nonpadded_image_sizes=fixed(reconstruction_info[0]), padded_image_sizes=fixed(reconstruction_info[1]), dataset_name=dataset_name, image_index=image_slider)
     
     plot_violin(predictions, dataset[1], model_names, violin_plot_filename)
 
