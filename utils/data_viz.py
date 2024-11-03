@@ -3,11 +3,11 @@ import math
 
 from patchify import unpatchify
 from ipywidgets import interact, IntSlider, fixed
-from data_loader.reconstruct_dataset import create_array_patches_per_image
+from data_loader.reconstruct_dataset import create_matrix_images_as_rows_patches_as_cols
 
 import numpy as np
 
-def visualize_reconstructed_images(images, masks, predictions, model_names, original_sizes, patches_size, patches_per_image, image_index):
+def visualize_reconstructed_images(images, masks, predictions, model_names, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes ,nonpadded_image_sizes, padded_image_sizes, dataset_name, image_index):
     def update(z):
         num_models = len(predictions)
         
@@ -17,30 +17,28 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, orig
         
         fig, axes = plt.subplots(num_rows, 3, figsize=(18, 6 * num_plots))
         
-        img_reshaped = images[image_index].reshape(patches_size[image_index])
-        mask_reshaped = masks[image_index].reshape(patches_size[image_index])
+        img_reshaped = images[image_index].reshape(nonreshaped_patches_arr_sizes[image_index])
+        mask_reshaped = masks[image_index].reshape(nonreshaped_patches_arr_sizes[image_index])
         
-        img = unpatchify(img_reshaped, original_sizes[image_index])[z, :, :]
-        mask = unpatchify(mask_reshaped, original_sizes[image_index])[z, :, :]
+        img = unpatchify(img_reshaped, padded_image_sizes[image_index])[:nonpadded_image_sizes[image_index][0], :nonpadded_image_sizes[image_index][1], :nonpadded_image_sizes[image_index][2]]
+        mask = unpatchify(mask_reshaped, padded_image_sizes[image_index])[:nonpadded_image_sizes[image_index][0], :nonpadded_image_sizes[image_index][1], :nonpadded_image_sizes[image_index][2]]
         
-        axes[0, 0].imshow(img, cmap='gray')
+        axes[0, 0].imshow(binarize_predictions(img[z, :, :]), cmap='gray')
         axes[0, 0].axis('off')
         axes[0, 0].set_title('Image')
 
-        axes[0, 1].imshow(mask, cmap='gray')
+        axes[0, 1].imshow(binarize_predictions(mask[z, :, :]), cmap='gray')
         axes[0, 1].axis('off')
         axes[0, 1].set_title('Ground Truth Mask')
 
         for i in range(num_models):
             row = (i + 2) // 3
             col = (i + 2) % 3
-            predictions_and_its_masks = create_array_patches_per_image(predictions[i], patches_per_image)
-            pred_reshaped = predictions_and_its_masks[image_index].reshape(patches_size[image_index])
-            pred = unpatchify(pred_reshaped, original_sizes[image_index])[z, :, :]
-            
-            if pred.shape[0] < pred.shape[1]: 
-                pred = np.transpose(pred, (1, 0))
-            axes[row, col].imshow(binarize_predictions(pred), cmap='gray')
+            prediction_patches_matrix = create_matrix_images_as_rows_patches_as_cols(predictions[i], reshaped_patches_arr_sizes)
+            pred_reshaped = prediction_patches_matrix[image_index].reshape(nonreshaped_patches_arr_sizes[image_index])
+            pred = unpatchify(pred_reshaped, padded_image_sizes[image_index])[: nonpadded_image_sizes[image_index][0], :nonpadded_image_sizes[image_index][1], :nonpadded_image_sizes[image_index][2]]
+                        
+            axes[row, col].imshow(binarize_predictions(pred[z, :, :]), cmap='gray')
             axes[row, col].axis('off')
             axes[row, col].set_title(model_names[i] + " Prediction")
         
@@ -54,7 +52,7 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, orig
     z_slider = IntSlider(
         value=0,
         min=0,
-        max=original_sizes[image_index][2] - 1,
+        max=nonpadded_image_sizes[image_index][2] - 1,
         step=1,
         description='Z value:',
         continuous_update=False
