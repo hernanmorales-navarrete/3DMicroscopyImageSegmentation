@@ -63,7 +63,8 @@ def plot_violin(predictions, ground_truth, model_names, filename):
         plt.title(metric)
         # Dynamically set the y-axis limit
         y_min = max(df[df['Metric'] == metric]['Value'].min() - 0.1, 0)
-        plt.ylim(y_min, 1.1)
+        y_max = max(df[df['Metric'] == metric]['Value'].max() + 0.1, 1.1)
+        plt.ylim(y_min, y_max)
 
     plt.tight_layout()
     plt.savefig(filename + ".svg")
