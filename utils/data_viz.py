@@ -20,12 +20,8 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, orig
         img_reshaped = images[image_index].reshape(patches_size[image_index])
         mask_reshaped = masks[image_index].reshape(patches_size[image_index])
         
-        img = unpatchify(img_reshaped, original_sizes[image_index])[:, :, z]
-        mask = unpatchify(mask_reshaped, original_sizes[image_index])[:, :, z]
-        
-        if np.shape(img)[0] < np.shape(img)[1]:
-            img = np.transpose(img)
-            mask= np.transpose(mask)
+        img = unpatchify(img_reshaped, original_sizes[image_index])[z, :, :]
+        mask = unpatchify(mask_reshaped, original_sizes[image_index])[z, :, :]
         
         axes[0, 0].imshow(img, cmap='gray')
         axes[0, 0].axis('off')
@@ -40,7 +36,7 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, orig
             col = (i + 2) % 3
             predictions_and_its_masks = create_array_patches_per_image(predictions[i], patches_per_image)
             pred_reshaped = predictions_and_its_masks[image_index].reshape(patches_size[image_index])
-            pred = unpatchify(pred_reshaped, original_sizes[image_index])[:, :, z]
+            pred = unpatchify(pred_reshaped, original_sizes[image_index])[z, :, :]
             
             if pred.shape[0] < pred.shape[1]: 
                 pred = np.transpose(pred, (1, 0))
@@ -78,8 +74,8 @@ def visualize_patches_3D_in_2D(dataset, predictions, model_names, patch_idx, z):
     
     fig, axes = plt.subplots(num_rows, 3, figsize=(18, 6 * num_rows))
 
-    img_2D = image[:, :, z]
-    mask_2D = mask[:, :, z]
+    img_2D = image[z, :, :]
+    mask_2D = mask[z, :, :]
 
     axes[0, 0].imshow(img_2D, cmap='gray')
     axes[0, 0].axis('off')
@@ -92,7 +88,7 @@ def visualize_patches_3D_in_2D(dataset, predictions, model_names, patch_idx, z):
     for i in range(num_models):
         row = (i + 2) // 3
         col = (i + 2) % 3
-        pred_2D = binarize_predictions(predictions[i][patch_idx][:, :, z])
+        pred_2D = binarize_predictions(predictions[i][patch_idx][z, :, :])
         axes[row, col].imshow(pred_2D, cmap='gray')
         axes[row, col].axis('off')
         axes[row, col].set_title(model_names[i] + " Prediction")
