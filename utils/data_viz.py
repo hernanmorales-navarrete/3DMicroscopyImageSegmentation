@@ -99,4 +99,4 @@ def visualize_patches_3D_in_2D(dataset, predictions, model_names, patch_idx, z):
     plt.show()
     
 def binarize_predictions(predictions, threshold=0.5):
-    return (predictions >= threshold).astype(int)
+    return (predictions >= threshold).astype(np.uint8)
