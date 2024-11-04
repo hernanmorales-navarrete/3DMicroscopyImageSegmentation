@@ -2,6 +2,7 @@ from tensorflow.keras.models import load_model
 from data_loader.reconstruct_dataset import create_dataset_inference, create_matrix_images_as_rows_patches_as_cols
 
 from utils.data_viz import visualize_patches_3D_in_2D, visualize_reconstructed_images
+from utils.masks import save_masks_inference
 from ipywidgets import IntSlider, interact, fixed
 from utils.metrics import plot_violin
 
@@ -71,6 +72,10 @@ def inference(
     )
     
     interact(visualize_reconstructed_images, images=fixed(img_patches_matrix), masks=fixed(mask_patches_matrix), predictions=fixed(predictions), model_names=fixed(model_names), nonreshaped_patches_arr_sizes=fixed(reconstruction_info[2]), reshaped_patches_arr_sizes=fixed(reconstruction_info[3]), nonpadded_image_sizes=fixed(reconstruction_info[0]), padded_image_sizes=fixed(reconstruction_info[1]), dataset_name=fixed(dataset_name), image_index=image_slider)
+    
+    print('Saving inference masks...')
+    
+    save_masks_inference(predictions, reconstruction_info[3], reconstruction_info[2], reconstruction_info[1], reconstruction_info[0], dataset_name, model_names, all_images_names)
     
     plot_violin(predictions, dataset[1], model_names, violin_plot_filename)
 
