@@ -60,3 +60,6 @@ logs/
 
 #Exclude keras model
 *.keras
+
+#Exclude .tif files
+*.tif
