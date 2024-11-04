@@ -52,7 +52,7 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, nonr
     z_slider = IntSlider(
         value=0,
         min=0,
-        max=nonpadded_image_sizes[image_index][2] - 1,
+        max=nonpadded_image_sizes[image_index][0] - 1,
         step=1,
         description='Z value:',
         continuous_update=False
