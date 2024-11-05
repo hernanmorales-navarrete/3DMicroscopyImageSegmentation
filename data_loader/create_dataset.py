@@ -51,15 +51,15 @@ def create_patches_from_images_in_dir(data_dir, patch_shape=(64, 64, 64), patch_
     return np.array(images), np.array(masks)
 
 
-def create_tf_datasets(dir, percent_val=None, patch_shape, patch_step, random_state=42): 
+def create_tf_datasets(dir, patch_shape, patch_step, percent_val=0, random_state=42):
     patches, masks = create_patches_from_images_in_dir(dir, patch_shape, patch_step)
     
-    if percent_val is not None: 
+    if percent_val != 0: 
         train_patches, val_patches, train_masks, val_masks = train_test_split(patches, masks, test_size=percent_val, random_state=random_state)
         train_dataset = (train_patches, train_masks)
         val_dataset = (val_patches, val_masks)
         
         return train_dataset, val_dataset
     else:
-        throw ValueError('Please provide a percentage for the validation dataset')
+        raise ValueError('Validation percentage must be greater than 0')
     
