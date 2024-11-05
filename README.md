@@ -15,16 +15,16 @@ Python code for fluorescence microscopy image segmentation using deep learning. 
 
 ## Instalation
 
-The dependencies in requirements.txt are needed in order to run the functions in a Jupyter Notebook. Install Conda and create a new environment called "tf-gpu" with Python 3.10: 
+The dependencies in requirements.txt are needed in order to run the functions in a Jupyter Notebook. Install Conda and create a new environment called "img_seg_env" with Python 3.10: 
 
 ```
-conda create -n tf-gpu python=3.10
+conda create -n img_seg_env python=3.10
 ```
 
 Enter the environment and install the dependencies in requirements.txt: 
 
 ```
-conda activate tf-gpu
+conda activate img_seg_env
 pip install -r requirements.txt
 ```
 
