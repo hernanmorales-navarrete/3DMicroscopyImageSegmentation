@@ -90,6 +90,38 @@ def create_patches_from_images_in_dir(data_dir, patch_shape, patch_step):
         
     return all_images_names, np.array(all_images_patches), np.array(all_masks_patches), nonpadded_image_sizes, padded_image_sizes, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes
 
+
+def create_patches_from_images_in_dir_only_images(input_dir, patch_shape, patch_step):
+
+    images_dir = Path(input_dir)
+    images_files = sorted(images_dir.glob('*.tif'))   
+    all_images_patches = []
+    
+    nonpadded_image_sizes =  []
+    padded_image_sizes = []
+    nonreshaped_patches_arr_sizes = []
+    reshaped_patches_arr_sizes = []
+    
+    all_images_names = []
+    
+    for image in images_files: 
+        key = image.stem
+        print(f'Processing {image.stem} image')
+
+        img_patches, nonpadded_img_size, padded_image_size, nonreshaped_patches_arr_size, reshaped_patches_arr_size = patchify3DImage(image, patch_shape, patch_step)
+        
+        all_images_patches.extend(img_patches)
+        
+        nonpadded_image_sizes.append(nonpadded_img_size)
+        padded_image_sizes.append(padded_image_size)
+        nonreshaped_patches_arr_sizes.append(nonreshaped_patches_arr_size)
+        reshaped_patches_arr_sizes.append(reshaped_patches_arr_size)
+        
+        all_images_names.append(image.stem)
+        
+    return all_images_names, np.array(all_images_patches), nonpadded_image_sizes, padded_image_sizes, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes
+
+    
 def create_matrix_images_as_rows_patches_as_cols(patches, patches_per_images):
     patches_per_image = []
     start = 0
@@ -105,6 +137,16 @@ def create_dataset_inference(dir, patch_shape, patch_step):
     all_images_names, all_images_patches, all_masks_patches, nonpadded_image_sizes, padded_image_sizes, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes = create_patches_from_images_in_dir(dir, patch_shape, patch_step)
     
     dataset = (all_images_patches, all_masks_patches)
+    reconstruction_info = (nonpadded_image_sizes, padded_image_sizes, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes)
+    
+    return all_images_names, dataset, reconstruction_info
+
+
+
+def create_dataset_prediction(dir, patch_shape, patch_step): 
+    all_images_names, all_images_patches, nonpadded_image_sizes, padded_image_sizes, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes = create_patches_from_images_in_dir_only_images(dir, patch_shape, patch_step)
+    
+    dataset = all_images_patches
     reconstruction_info = (nonpadded_image_sizes, padded_image_sizes, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes)
     
     return all_images_names, dataset, reconstruction_info
