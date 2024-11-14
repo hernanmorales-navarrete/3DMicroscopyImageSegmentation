@@ -23,11 +23,11 @@ def visualize_reconstructed_images(images, masks, predictions, model_names, nonr
         img = unpatchify(img_reshaped, padded_image_sizes[image_index])[:nonpadded_image_sizes[image_index][0], :nonpadded_image_sizes[image_index][1], :nonpadded_image_sizes[image_index][2]]
         mask = unpatchify(mask_reshaped, padded_image_sizes[image_index])[:nonpadded_image_sizes[image_index][0], :nonpadded_image_sizes[image_index][1], :nonpadded_image_sizes[image_index][2]]
         
-        axes[0, 0].imshow(binarize_predictions(img[z, :, :]), cmap='gray')
+        axes[0, 0].imshow(img[z, :, :], cmap='gray', vmin= 0, vmax=np.amax(img[z, :, :]))
         axes[0, 0].axis('off')
         axes[0, 0].set_title('Image')
 
-        axes[0, 1].imshow(binarize_predictions(mask[z, :, :]), cmap='gray')
+        axes[0, 1].imshow(mask[z, :, :], cmap='gray')
         axes[0, 1].axis('off')
         axes[0, 1].set_title('Ground Truth Mask')
 
