@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 import math
-
+import numpy as np
 from patchify import unpatchify
 from ipywidgets import interact, IntSlider, fixed
-from data_loader.reconstruct_dataset import create_matrix_images_as_rows_patches_as_cols
+import os
 
-import numpy as np
+from src.data_loader.reconstruct_dataset import create_matrix_images_as_rows_patches_as_cols
 
 def visualize_reconstructed_images(images, masks, predictions, model_names, nonreshaped_patches_arr_sizes, reshaped_patches_arr_sizes ,nonpadded_image_sizes, padded_image_sizes, dataset_name, image_index):
     def update(z):

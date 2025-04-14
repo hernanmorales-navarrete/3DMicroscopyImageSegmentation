@@ -1,10 +1,10 @@
 from tensorflow.keras.models import load_model
-from data_loader.reconstruct_dataset import create_dataset_inference, create_dataset_prediction, create_matrix_images_as_rows_patches_as_cols
+from src.data_loader.reconstruct_dataset import create_dataset_inference, create_dataset_prediction, create_matrix_images_as_rows_patches_as_cols
 
-from utils.data_viz import visualize_patches_3D_in_2D, visualize_reconstructed_images, binarize_predictions
-from utils.masks import save_masks_inference
+from src.utils.data_viz import visualize_patches_3D_in_2D, visualize_reconstructed_images, binarize_predictions
+from src.utils.masks import save_masks_inference
 from ipywidgets import IntSlider, interact, fixed
-from utils.metrics import plot_violin
+from src.utils.metrics import plot_violin
 
 import matplotlib.pyplot as plt
 
@@ -21,7 +21,7 @@ def predict_model(test_dataset, model_path, batch_size):
 def inference(
     input_dir, 
     model_path, 
-    model_name,
+model_name,
     patch_shape,
     patch_step,
     batch_size,

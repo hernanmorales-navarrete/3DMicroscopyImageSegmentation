@@ -1,7 +1,7 @@
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 import seaborn as sns
 import pandas as pd
-from utils.data_viz import binarize_predictions
+from src.utils.data_viz import binarize_predictions
 
 import matplotlib.pyplot as plt
 
