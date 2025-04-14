@@ -1,14 +1,31 @@
 from tensorflow.keras import Model, Layer
-from tensorflow.keras.layers import Conv3D, ReLU, MaxPool3D, UpSampling3D, Input, Concatenate, GroupNormalization, Conv3DTranspose, GlobalAveragePooling3D, Dense, Reshape, Activation, Dot, Add, Multiply
+from tensorflow.keras.layers import (
+    Conv3D,
+    ReLU,
+    MaxPool3D,
+    UpSampling3D,
+    Input,
+    Concatenate,
+    GroupNormalization,
+    Conv3DTranspose,
+    GlobalAveragePooling3D,
+    Dense,
+    Reshape,
+    Activation,
+    Dot,
+    Add,
+    Multiply,
+)
+
 
 class UNet3D:
     def Encoder(self, x, out_channels, isMaxPool):
-        if isMaxPool: 
-            x = MaxPool3D(2, padding='same')(x)
-            
-        x = Conv3D(out_channels, 3, padding='same')(x)
+        if isMaxPool:
+            x = MaxPool3D(2, padding="same")(x)
+
+        x = Conv3D(out_channels, 3, padding="same")(x)
         x = ReLU()(x)
-        x = Conv3D(out_channels, 3, padding='same')(x)
+        x = Conv3D(out_channels, 3, padding="same")(x)
         x = ReLU()(x)
         return x
 
@@ -32,6 +49,6 @@ class UNet3D:
         decoder2 = self.Decoder(decoder3, encoder2, 128)
         decoder1 = self.Decoder(decoder2, encoder1, 64)
 
-        output = Conv3D(1, 1, activation='sigmoid')(decoder1)
+        output = Conv3D(1, 1, activation="sigmoid")(decoder1)
 
         return Model(x, output)
