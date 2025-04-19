@@ -26,8 +26,18 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 PATCH_SIZE = (64, 64, 64)
 PATCH_BATCH = 1
 
+# Augmentation flags
 STANDARD_AUGMENTATION = True
 OURS_AUGMENTATION = False
+
+# Intensity augmentation parameters
+INTENSITY_PARAMS = {
+    "background_level": 0.1,  # Background intensity level
+    "local_variation_scale": 5,  # Scale of local variations
+    "z_decay_rate": 0.999,  # Rate of intensity decay along z-axis
+    "noise_std": 0.1,  # Standard deviation for Gaussian noise
+    "poisson_scale": 1.0,  # Scaling factor for Poisson noise
+}
 
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
