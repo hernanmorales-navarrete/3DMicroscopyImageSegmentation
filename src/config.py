@@ -37,6 +37,9 @@ INTENSITY_PARAMS = {
     "z_decay_rate": 0.999,  # Rate of intensity decay along z-axis
     "noise_std": 0.1,  # Standard deviation for Gaussian noise
     "poisson_scale": 1.0,  # Scaling factor for Poisson noise
+    "use_psf": False,  # Whether to apply PSF convolution
+    "psf_path": None,  # Path to PSF file (required if use_psf is True)
+    "intensity_scale": 1000.0,  # Scale factor for image intensity before augmentation
 }
 
 # If tqdm is installed, configure loguru with tqdm.write

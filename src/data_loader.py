@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import albumentations as A
+import tifffile as tiff
 from config import (
     PATCH_SIZE,
     PATCH_BATCH,
@@ -35,6 +36,38 @@ def create_3d_augmentation_pipeline():
     )
 
 
+def normalize_psf(psf):
+    """Normalize PSF to sum to 1."""
+    psf_sum = np.sum(psf)
+    if not np.isclose(psf_sum, 1.0):
+        psf = psf / psf_sum
+    return psf
+
+
+def convolve_with_psf(image, psf):
+    """Convolve 3D image with PSF."""
+    # Normalize PSF
+    psf = normalize_psf(psf)
+
+    # Calculate padding
+    pad_size = psf.shape
+
+    # Pad image
+    padded_image = np.pad(image, [(p, p) for p in pad_size] + [(0, 0)], mode="reflect")
+
+    # Convolve
+    convolved_padded = fftconvolve(padded_image, psf[..., np.newaxis], mode="same")
+
+    # Remove padding
+    slices = tuple(slice(p, -p) for p in pad_size) + (slice(None),)
+    convolved_image = convolved_padded[slices]
+
+    # Ensure non-negative values
+    convolved_image = np.clip(convolved_image, 0, None)
+
+    return convolved_image
+
+
 def simulate_local_variations(shape, binnings=[1, 2, 4, 8], scale=5):
     """Simulate local variations in staining intensity.
 
@@ -44,6 +77,7 @@ def simulate_local_variations(shape, binnings=[1, 2, 4, 8], scale=5):
         scale: Scale of the smoothing kernel
 
     Returns:
+
         Array of local intensity variations
     """
     result = np.ones(shape)
@@ -64,36 +98,26 @@ def simulate_local_variations(shape, binnings=[1, 2, 4, 8], scale=5):
 
 
 def augment_patch_intensity(patch, params=INTENSITY_PARAMS):
-    """Apply intensity-based augmentations to a 3D patch.
+    """Apply intensity-based augmentations to a 3D patch."""
+    # Scale intensity before augmentation
+    patch = patch * params["intensity_scale"]
 
-    Args:
-        patch: Input 3D patch
-        params: Dict with augmentation parameters:
-            - background_level: Background intensity level
-            - local_variation_scale: Scale of local variations
-            - z_decay_rate: Rate of intensity decay along z-axis
-            - noise_std: Standard deviation for Gaussian noise
-            - poisson_scale: Scaling factor for Poisson noise
-
-    Returns:
-        Augmented patch
-    """
-    # Add local variations
+    # Step 1: Add local variations and staining effects
     local_var = simulate_local_variations(
-        patch.shape[:-1],  # Remove channel dim
+        patch.shape[:-1],
         binnings=[1, 2, 4, 8],
         scale=params["local_variation_scale"],
     )
     patch = patch * local_var[..., np.newaxis]
 
-    # Add z-axis intensity decay
+    # Step 2: Add z-axis intensity decay
     if 0 < params["z_decay_rate"] < 1:
         z_profile = np.exp(-np.arange(patch.shape[0]) * (1 - params["z_decay_rate"]))
         patch = patch * z_profile[:, np.newaxis, np.newaxis, np.newaxis]
 
-    # Add background
+    # Step 3: Add background
     if params["background_level"] > 0:
-        bg = np.ones_like(patch) * params["background_level"]
+        bg = np.ones_like(patch) * params["background_level"] * params["intensity_scale"]
         bg_noise = (
             bg
             * simulate_local_variations(
@@ -103,18 +127,26 @@ def augment_patch_intensity(patch, params=INTENSITY_PARAMS):
         bg_noise[patch > 0] = 0
         patch = patch + bg_noise
 
-    # Add Poisson noise
+    # Step 4: Apply PSF convolution if specified
+    if params["use_psf"] and params["psf_path"]:
+        psf = tiff.imread(params["psf_path"])
+        patch = convolve_with_psf(patch, psf)
+
+    # Step 5: Add Poisson noise
     if params["poisson_scale"] > 0:
         scaled = patch * params["poisson_scale"]
         patch = np.random.poisson(scaled) / params["poisson_scale"]
 
-    # Add Gaussian noise
+    # Step 6: Add Gaussian noise
     if params["noise_std"] > 0:
-        noise = np.random.normal(0, params["noise_std"], patch.shape)
+        noise = np.random.normal(0, params["noise_std"] * params["intensity_scale"], patch.shape)
         patch = patch + noise
 
     # Ensure non-negative values
     patch = np.clip(patch, 0, None)
+
+    # Scale back to original range
+    patch = patch / params["intensity_scale"]
 
     return patch
 
