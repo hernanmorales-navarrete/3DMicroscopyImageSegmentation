@@ -88,13 +88,13 @@ class AttentionUNet3D:
     def decoder(self, x, encoder_input, out_channels):
         # Upsample
         x = Conv3DTranspose(out_channels, 2, 2)(x)
-        
+
         # Add skip connection
         x = Add()([encoder_input, x])
-        
+
         # Apply attention
         x = self.attention(x, out_channels)
-        
+
         # Double convolution
         return self.double_conv(x, out_channels)
 
