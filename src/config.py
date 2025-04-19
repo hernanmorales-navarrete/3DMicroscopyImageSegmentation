@@ -26,6 +26,9 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 PATCH_SIZE = (64, 64, 64)
 PATCH_BATCH = 1
 
+STANDARD_AUGMENTATION = True
+OURS_AUGMENTATION = False
+
 # If tqdm is installed, configure loguru with tqdm.write
 # https://github.com/Delgan/loguru/issues/135
 try:
