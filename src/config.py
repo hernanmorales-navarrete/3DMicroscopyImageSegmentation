@@ -2,6 +2,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from loguru import logger
+import tensorflow as tf
 
 # Load environment variables from .env file if it exists
 load_dotenv()
@@ -17,6 +18,7 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 EXTERNAL_DATA_DIR = DATA_DIR / "external"
 
 MODELS_DIR = PROJ_ROOT / "models"
+LOGS_DIR = MODELS_DIR / "logs"
 
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
@@ -51,3 +53,33 @@ try:
     logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True)
 except ModuleNotFoundError:
     pass
+
+# Training Configuration
+RANDOM_SEED = 42
+AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
+
+# Training hyperparameters
+LEARNING_RATE = 1e-4
+BATCH_SIZE = 32  # Default Keras batch size
+NUM_EPOCHS = 100
+VALIDATION_SPLIT = 0.2
+
+# Early stopping parameters
+EARLY_STOPPING_PATIENCE = 10
+EARLY_STOPPING_MIN_DELTA = 0  # Use Keras default
+
+# Model checkpoint parameters
+CHECKPOINT_MONITOR = "val_loss"
+CHECKPOINT_MODE = "min"
+SAVE_BEST_ONLY = True
+CHECKPOINT_SAVE_FREQ = "epoch"
+CHECKPOINT_SAVE_WEIGHTS_ONLY = False
+CHECKPOINT_SAVE_FORMAT = "h5"  # or 'tf' for SavedModel format
+
+# Loss and metrics
+LOSS_FUNCTION = "binary_crossentropy"
+METRICS = ["accuracy"]
+
+# Tensorboard
+TENSORBOARD_UPDATE_FREQ = "epoch"
+PROFILE_BATCH = 0  # Disable profiling

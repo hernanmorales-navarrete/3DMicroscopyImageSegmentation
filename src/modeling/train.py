@@ -1,29 +1,154 @@
 from pathlib import Path
-
+import tensorflow as tf
+import keras
 from loguru import logger
-from tqdm import tqdm
 import typer
+from datetime import datetime
+import inspect
 
-from src.config import MODELS_DIR, PROCESSED_DATA_DIR
+from src.config import (
+    MODELS_DIR,
+    LOGS_DIR,
+    PROCESSED_DATA_DIR,
+    RANDOM_SEED,
+    LEARNING_RATE,
+    BATCH_SIZE,
+    NUM_EPOCHS,
+    VALIDATION_SPLIT,
+    EARLY_STOPPING_PATIENCE,
+    EARLY_STOPPING_MIN_DELTA,
+    CHECKPOINT_MONITOR,
+    CHECKPOINT_MODE,
+    SAVE_BEST_ONLY,
+    LOSS_FUNCTION,
+    METRICS,
+    TENSORBOARD_UPDATE_FREQ,
+)
+from src.data_loader import ImageDataset
+import src.models as models_module
+
 
 app = typer.Typer()
 
 
+def set_random_seed():
+    """Set random seed for reproducibility."""
+    keras.utils.set_random_seed(RANDOM_SEED)
+    tf.config.experimental.enable_op_determinism()
+
+
+def get_available_models():
+    """Dynamically get all model classes from models.py."""
+    model_classes = {}
+    for name, obj in inspect.getmembers(models_module):
+        if inspect.isclass(obj) and hasattr(obj, "build_model"):
+            model_classes[name] = obj
+    return model_classes
+
+
+def get_model_class(model_name):
+    """Get model class by name."""
+    model_classes = get_available_models()
+    if model_name not in model_classes:
+        available_models = list(model_classes.keys())
+        raise ValueError(f"Model {model_name} not found. Available models: {available_models}")
+    return model_classes[model_name]
+
+
+def create_callbacks(model_name: str):
+    """Create training callbacks."""
+    callbacks = []
+
+    # Create directories for logs and checkpoints
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = LOGS_DIR / model_name / timestamp
+    checkpoint_dir = MODELS_DIR / model_name / timestamp
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    # TensorBoard callback
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=str(log_dir),
+        update_freq=TENSORBOARD_UPDATE_FREQ,
+    )
+    callbacks.append(tensorboard_callback)
+
+    # Early stopping callback
+    early_stopping = tf.keras.callbacks.EarlyStopping(
+        monitor=CHECKPOINT_MONITOR,
+        min_delta=EARLY_STOPPING_MIN_DELTA,
+        patience=EARLY_STOPPING_PATIENCE,
+        mode=CHECKPOINT_MODE,
+        restore_best_weights=True,
+    )
+    callbacks.append(early_stopping)
+
+    # Model checkpoint callback
+    checkpoint_path = checkpoint_dir / "model_{epoch:02d}_{val_loss:.4f}.h5"
+    checkpoint = tf.keras.callbacks.ModelCheckpoint(
+        str(checkpoint_path),
+        monitor=CHECKPOINT_MONITOR,
+        save_best_only=SAVE_BEST_ONLY,
+        mode=CHECKPOINT_MODE,
+    )
+    callbacks.append(checkpoint)
+
+    return callbacks
+
+
 @app.command()
 def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    features_path: Path = PROCESSED_DATA_DIR / "features.csv",
-    labels_path: Path = PROCESSED_DATA_DIR / "labels.csv",
-    model_path: Path = MODELS_DIR / "model.pkl",
-    # -----------------------------------------
+    model_name: str = typer.Argument(..., help="Name of the model to train"),
+    data_dir: Path = typer.Option(PROCESSED_DATA_DIR, help="Directory containing the dataset"),
+    enable_reproducibility: bool = typer.Option(
+        True, help="Enable reproducibility by setting random seeds"
+    ),
+    list_models: bool = typer.Option(False, help="List available models and exit"),
 ):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Training some model...")
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Modeling training complete.")
-    # -----------------------------------------
+    """Train a 3D segmentation model."""
+    # List available models if requested
+    if list_models:
+        available_models = get_available_models()
+        logger.info("Available models:")
+        for name in available_models:
+            logger.info(f"  - {name}")
+        return
+
+    if enable_reproducibility:
+        logger.info(f"Setting random seed to {RANDOM_SEED}")
+        set_random_seed()
+
+    logger.info("Loading dataset...")
+    train_dataset = ImageDataset(
+        data_dir=str(data_dir),
+        batch_size=BATCH_SIZE,
+    )
+
+    logger.info(f"Creating {model_name} model...")
+    model_class = get_model_class(model_name)
+    model = model_class().build_model()
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
+
+    model.compile(
+        optimizer=optimizer,
+        loss=LOSS_FUNCTION,
+        metrics=METRICS,
+    )
+
+    callbacks = create_callbacks(model_name)
+
+    logger.info("Starting training...")
+    model.fit(
+        train_dataset,
+        epochs=NUM_EPOCHS,
+        validation_split=VALIDATION_SPLIT,
+        callbacks=callbacks,
+        verbose=1,
+    )
+
+    logger.success("Training complete!")
 
 
 if __name__ == "__main__":
