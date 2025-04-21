@@ -1,163 +1,32 @@
-import tensorflow as tf
-import numpy as np
 import os
-import albumentations as A
-import tifffile as tiff
+import numpy as np
+import tensorflow as tf
 from config import (
     PATCH_SIZE,
     PATCH_BATCH,
     STANDARD_AUGMENTATION,
     OURS_AUGMENTATION,
-    INTENSITY_PARAMS,
 )
-from scipy.signal import fftconvolve
-from scipy.ndimage import convolve, zoom
-
-
-def create_3d_augmentation_pipeline():
-    """Create an augmentation pipeline for 3D patches using supported transforms."""
-    return A.Compose(
-        [
-            # Spatial transform - flips and rotations
-            A.CubicSymmetry(p=0.7),
-            A.CoarseDropout3D(
-                max_holes=8,
-                max_height=8,
-                max_width=8,
-                max_depth=8,
-                min_holes=4,
-                min_height=4,
-                min_width=4,
-                min_depth=4,
-                fill_value=0,
-                p=0.3,
-            ),
-        ]
-    )
-
-
-def normalize_psf(psf):
-    """Normalize PSF to sum to 1."""
-    psf_sum = np.sum(psf)
-    if not np.isclose(psf_sum, 1.0):
-        psf = psf / psf_sum
-    return psf
-
-
-def convolve_with_psf(image, psf):
-    """Convolve 3D image with PSF."""
-    # Normalize PSF
-    psf = normalize_psf(psf)
-
-    # Calculate padding
-    pad_size = psf.shape
-
-    # Pad image
-    padded_image = np.pad(image, [(p, p) for p in pad_size] + [(0, 0)], mode="reflect")
-
-    # Convolve
-    convolved_padded = fftconvolve(padded_image, psf[..., np.newaxis], mode="same")
-
-    # Remove padding
-    slices = tuple(slice(p, -p) for p in pad_size) + (slice(None),)
-    convolved_image = convolved_padded[slices]
-
-    # Ensure non-negative values
-    convolved_image = np.clip(convolved_image, 0, None)
-
-    return convolved_image
-
-
-def simulate_local_variations(shape, binnings=[1, 2, 4, 8], scale=5):
-    """Simulate local variations in staining intensity.
-
-    Args:
-        shape: Shape of the patch
-        binnings: List of binning factors for multi-scale variations
-        scale: Scale of the smoothing kernel
-
-    Returns:
-
-        Array of local intensity variations
-    """
-    result = np.ones(shape)
-    for binning in binnings:
-        # Calculate smaller shape based on binning
-        small_shape = tuple(dim // binning for dim in shape)
-        zoom_factors = [orig_dim / small_dim for orig_dim, small_dim in zip(shape, small_shape)]
-
-        # Generate and smooth local variations
-        local_var = np.random.normal(size=small_shape) + 1.0
-        smoothed = convolve(local_var, np.ones((scale, scale, scale)) / scale**3)
-
-        # Zoom back to original size and combine
-        variation = zoom(smoothed, zoom_factors, order=1)
-        result *= variation
-
-    return result
-
-
-def augment_patch_intensity(patch, params=INTENSITY_PARAMS):
-    """Apply intensity-based augmentations to a 3D patch."""
-    # Scale intensity before augmentation
-    patch = patch * params["intensity_scale"]
-
-    # Step 1: Add local variations and staining effects
-    local_var = simulate_local_variations(
-        patch.shape[:-1],
-        binnings=[1, 2, 4, 8],
-        scale=params["local_variation_scale"],
-    )
-    patch = patch * local_var[..., np.newaxis]
-
-    # Step 2: Add z-axis intensity decay
-    if 0 < params["z_decay_rate"] < 1:
-        z_profile = np.exp(-np.arange(patch.shape[0]) * (1 - params["z_decay_rate"]))
-        patch = patch * z_profile[:, np.newaxis, np.newaxis, np.newaxis]
-
-    # Step 3: Add background
-    if params["background_level"] > 0:
-        bg = np.ones_like(patch) * params["background_level"] * params["intensity_scale"]
-        bg_noise = (
-            bg
-            * simulate_local_variations(
-                patch.shape[:-1], binnings=[1, 2], scale=params["local_variation_scale"]
-            )[..., np.newaxis]
-        )
-        bg_noise[patch > 0] = 0
-        patch = patch + bg_noise
-
-    # Step 4: Apply PSF convolution if specified
-    if params["use_psf"] and params["psf_path"]:
-        psf = tiff.imread(params["psf_path"])
-        patch = convolve_with_psf(patch, psf)
-
-    # Step 5: Add Poisson noise
-    if params["poisson_scale"] > 0:
-        scaled = patch * params["poisson_scale"]
-        patch = np.random.poisson(scaled) / params["poisson_scale"]
-
-    # Step 6: Add Gaussian noise
-    if params["noise_std"] > 0:
-        noise = np.random.normal(0, params["noise_std"] * params["intensity_scale"], patch.shape)
-        patch = patch + noise
-
-    # Ensure non-negative values
-    patch = np.clip(patch, 0, None)
-
-    # Scale back to original range
-    patch = patch / params["intensity_scale"]
-
-    return patch
+from microscopy_augmentations import augment_patch_intensity, create_standard_augmentation_pipeline
 
 
 class ImageDataset(tf.keras.utils.PyDataset):
+    """Dataset class for loading and augmenting 3D microscopy images.
+
+    This class handles:
+    1. Loading 3D TIF images and masks
+    2. Applying standard spatial augmentations (if enabled)
+    3. Applying microscopy-specific intensity augmentations (if enabled)
+    4. Batching the data
+    """
+
     def __init__(self, data_dir, batch_size=PATCH_BATCH, **kwargs):
         """Initialize the dataset.
 
         Args:
-            data_dir: Directory containing the dataset
+            data_dir: Directory containing the dataset with 'images' and 'masks' subdirectories
             batch_size: Number of samples per batch
+            **kwargs: Additional arguments passed to tf.keras.utils.PyDataset
         """
         super().__init__(**kwargs)
         self.data_dir = data_dir
@@ -165,7 +34,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
 
         # Create standard augmentation pipeline if needed
         if STANDARD_AUGMENTATION:
-            self.transform = create_3d_augmentation_pipeline()
+            self.transform = create_standard_augmentation_pipeline()
 
         # Get file paths
         self.image_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "images/*.tif")))
@@ -175,7 +44,15 @@ class ImageDataset(tf.keras.utils.PyDataset):
             raise ValueError("No data found in specified directory")
 
     def _augment_3d_patch(self, image, mask):
-        """Apply augmentations to a patch and its mask."""
+        """Apply augmentations to a patch and its mask.
+
+        Args:
+            image: Input image patch of shape (z, y, x, 1)
+            mask: Input mask patch of shape (z, y, x, 1)
+
+        Returns:
+            Tuple of (augmented_image, augmented_mask)
+        """
         if not STANDARD_AUGMENTATION and not OURS_AUGMENTATION:
             return image, mask
 
@@ -197,7 +74,14 @@ class ImageDataset(tf.keras.utils.PyDataset):
         return image, mask
 
     def _load_3d_tif(self, path):
-        """Load a 3D TIF file as a numpy array."""
+        """Load and normalize a 3D TIF file.
+
+        Args:
+            path: Path to the TIF file
+
+        Returns:
+            Normalized volume of shape (z, y, x, 1) with values in [0, 1]
+        """
         raw_data = tf.io.read_file(path)
         volume = tf.io.decode_raw(raw_data, tf.uint16)
         volume = tf.reshape(volume, PATCH_SIZE)
@@ -218,7 +102,15 @@ class ImageDataset(tf.keras.utils.PyDataset):
         return int(np.ceil(len(self.image_paths) / self.batch_size))
 
     def __getitem__(self, idx):
-        """Get batch at position idx."""
+        """Get batch at position idx.
+
+        Args:
+            idx: Batch index
+
+        Returns:
+            Tuple of (images, masks) where each is a numpy array of shape
+            (batch_size, z, y, x, 1)
+        """
         start_idx = idx * self.batch_size
         end_idx = min(start_idx + self.batch_size, len(self.image_paths))
         batch_image_paths = self.image_paths[start_idx:end_idx]
