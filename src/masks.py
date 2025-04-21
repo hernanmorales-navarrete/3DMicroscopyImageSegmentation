@@ -6,13 +6,13 @@ from typing import Union, Tuple
 from patchify import patchify
 from loguru import logger
 from tqdm.auto import tqdm
-from src.config import PATCH_SIZE
+from src.config import PATCH_SIZE, PATCH_STEP
 
 
 def generate_and_save_patches(
     dataset_dir: Union[str, Path],
     patch_size: Union[int, Tuple[int, int, int]] = PATCH_SIZE,
-    step_size: int = 1,
+    step_size: int = PATCH_STEP,
     output_subdir: str = "patches",
 ) -> None:
     """

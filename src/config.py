@@ -27,6 +27,7 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 
 PATCH_SIZE = (64, 64, 64)
 PATCH_BATCH = 1
+PATCH_STEP = 1
 
 # Augmentation flags
 STANDARD_AUGMENTATION = True
