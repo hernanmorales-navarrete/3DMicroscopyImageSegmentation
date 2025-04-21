@@ -42,6 +42,7 @@ INTENSITY_PARAMS = {
     "use_psf": False,  # Whether to apply PSF convolution
     "psf_path": None,  # Path to PSF file (required if use_psf is True)
     "intensity_scale": 1000.0,  # Scale factor for image intensity before augmentation
+    "snr_targets": [15, 10, 5, 4, 3, 2, 1],  # Target SNR values for augmentation
 }
 
 # If tqdm is installed, configure loguru with tqdm.write
