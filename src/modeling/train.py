@@ -26,6 +26,7 @@ from src.config import (
 )
 from src.data_loader import ImageDataset
 import src.models as models_module
+from src.masks import generate_and_save_patches
 
 
 app = typer.Typer()
@@ -119,9 +120,12 @@ def main(
         logger.info(f"Setting random seed to {RANDOM_SEED}")
         set_random_seed()
 
+    logger.info("Generating patches...")
+    generate_and_save_patches(data_dir=data_dir)
+
     logger.info("Loading dataset...")
     train_dataset = ImageDataset(
-        data_dir=str(data_dir),
+        data_dir=str(data_dir / "patches"),
         batch_size=BATCH_SIZE,
     )
 
