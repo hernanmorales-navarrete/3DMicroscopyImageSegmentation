@@ -5,6 +5,7 @@ from loguru import logger
 import typer
 from datetime import datetime
 import inspect
+from enum import Enum
 
 from src.config import (
     MODELS_DIR,
@@ -25,6 +26,12 @@ from src.config import (
 )
 from src.data_loader import ImageDataset
 import src.models as models_module
+
+
+class AugmentationType(str, Enum):
+    NONE = "NONE"
+    STANDARD = "STANDARD"
+    OURS = "OURS"
 
 
 app = typer.Typer()
@@ -54,14 +61,16 @@ def get_model_class(model_name):
     return model_classes[model_name]
 
 
-def create_callbacks(model_name: str):
+def create_callbacks(model_name: str, augmentation: AugmentationType):
     """Create training callbacks."""
     callbacks = []
 
-    # Create directories for logs and checkpoints
+    # Create directories for logs and checkpoints with augmentation info
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir = LOGS_DIR / model_name / timestamp
-    checkpoint_dir = MODELS_DIR / model_name / timestamp
+    model_dir_name = f"{model_name}_{augmentation.value}"
+
+    log_dir = LOGS_DIR / model_dir_name / timestamp
+    checkpoint_dir = MODELS_DIR / model_dir_name / timestamp
 
     log_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -84,7 +93,12 @@ def create_callbacks(model_name: str):
     callbacks.append(early_stopping)
 
     # Model checkpoint callback
-    checkpoint_path = checkpoint_dir / "model_{epoch:02d}_{val_loss:.4f}.h5"
+    checkpoint_path = (
+        checkpoint_dir
+        / "{model_name}_{augmentation}_E{epoch:02d}_L{val_loss:.4f}.h5".format(
+            model_name=model_name, augmentation=augmentation.value
+        )
+    )
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
         str(checkpoint_path),
         monitor=CHECKPOINT_MONITOR,
@@ -100,20 +114,30 @@ def create_callbacks(model_name: str):
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to train"),
     data_dir: Path = typer.Argument(..., help="Directory containing the dataset"),
+    augmentation: AugmentationType = typer.Option(
+        AugmentationType.NONE,
+        "--augmentation",
+        "-a",
+        help="Type of augmentation to use",
+    ),
     enable_reproducibility: bool = typer.Option(
         False, help="Enable reproducibility by setting random seeds"
     ),
 ):
-    """Train a 3D segmentation model."""
+    """Train a 3D segmentation model with optional augmentation."""
 
     if enable_reproducibility:
         logger.info(f"Setting random seed to {RANDOM_SEED}")
         set_random_seed()
 
+    logger.info(f"Using {augmentation.value} augmentation")
+
     logger.info("Loading dataset...")
     train_dataset = ImageDataset(
         data_dir=str(data_dir),
         batch_size=BATCH_SIZE,
+        use_standard_augmentation=(augmentation == AugmentationType.STANDARD),
+        use_ours_augmentation=(augmentation == AugmentationType.OURS),
     )
 
     logger.info(f"Creating {model_name} model...")
@@ -128,7 +152,7 @@ def main(
         metrics=METRICS,
     )
 
-    callbacks = create_callbacks(model_name)
+    callbacks = create_callbacks(model_name, augmentation)
 
     logger.info("Starting training...")
     model.fit(
