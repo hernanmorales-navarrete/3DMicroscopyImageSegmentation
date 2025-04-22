@@ -1,13 +1,16 @@
 import os
 import numpy as np
 import tensorflow as tf
-from config import (
+from src.config import (
     PATCH_SIZE,
     PATCH_BATCH,
     STANDARD_AUGMENTATION,
     OURS_AUGMENTATION,
 )
-from microscopy_augmentations import augment_patch_intensity, create_standard_augmentation_pipeline
+from src.microscopy_augmentations import (
+    augment_patch_intensity,
+    create_standard_augmentation_pipeline,
+)
 
 
 class ImageDataset(tf.keras.utils.PyDataset):

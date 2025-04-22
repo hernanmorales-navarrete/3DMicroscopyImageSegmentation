@@ -2,7 +2,7 @@ import numpy as np
 import tifffile as tiff
 from scipy.signal import fftconvolve
 from scipy.ndimage import convolve, zoom
-from config import INTENSITY_PARAMS
+from src.config import INTENSITY_PARAMS
 import albumentations as A
 
 
