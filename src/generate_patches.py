@@ -40,7 +40,7 @@ def generate_patches(
         )
 
     # Create output directories
-    patches_dir = dataset_dir / (dataset_dir.name + "_" + output_subdir)
+    patches_dir = dataset_dir / output_subdir
     patches_dir.mkdir(exist_ok=True, parents=True)
     patches_images_dir = patches_dir / "images"
     patches_masks_dir = patches_dir / "masks"
