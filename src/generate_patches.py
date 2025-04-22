@@ -1,3 +1,4 @@
+import typer
 import os
 import numpy as np
 from pathlib import Path
@@ -6,12 +7,15 @@ from typing import Union, Tuple
 from patchify import patchify
 from loguru import logger
 from tqdm.auto import tqdm
+
 from src.config import PATCH_SIZE, PATCH_STEP
 
+app = typer.Typer(help="CLI tool for generating 3D image patches from microscopy datasets")
 
-def generate_and_save_patches(
+
+def generate_patches(
     dataset_dir: Union[str, Path],
-    patch_size: Union[int, Tuple[int, int, int]] = PATCH_SIZE,
+    patch_size: Tuple[int, int, int] = PATCH_SIZE,
     step_size: int = PATCH_STEP,
     output_subdir: str = "patches",
 ) -> None:
@@ -21,9 +25,9 @@ def generate_and_save_patches(
 
     Args:
         dataset_dir: Root directory containing 'images' and 'masks' folders
-        patch_size: Size of 3D patches (tuple of 3 ints for x,y,z dimensions), defaults to config.PATCH_SIZE
-        step_size: Step size for patch generation (default: 1)
-        output_subdir: Name of subdirectory to save patches (default: "patches")
+        patch_size: Size of 3D patches (tuple of 3 ints for x,y,z dimensions)
+        step_size: Step size for patch generation
+        output_subdir: Name of subdirectory to save patches
     """
     dataset_dir = Path(dataset_dir)
     images_dir = dataset_dir / "images"
@@ -37,18 +41,11 @@ def generate_and_save_patches(
 
     # Create output directories
     patches_dir = dataset_dir / output_subdir
+    patches_dir.mkdir(exist_ok=True, parents=True)
     patches_images_dir = patches_dir / "images"
     patches_masks_dir = patches_dir / "masks"
     patches_images_dir.mkdir(exist_ok=True, parents=True)
     patches_masks_dir.mkdir(exist_ok=True, parents=True)
-
-    # Ensure patch_size is a 3D tuple
-    if isinstance(patch_size, int):
-        patch_size = (patch_size, patch_size, patch_size)
-    elif len(patch_size) != 3:
-        raise ValueError(
-            "patch_size must be either an integer or a tuple of 3 integers for 3D patches"
-        )
 
     # Get all TIFF image files
     image_extensions = (".tiff", ".tif")
@@ -125,3 +122,30 @@ def generate_and_save_patches(
             continue
 
     logger.success("Patch generation complete!")
+
+
+@app.command()
+def main(
+    dataset_dir: Path = typer.Argument(
+        ...,
+        help="Directory containing the dataset with 'images' and 'masks' subdirectories",
+        exists=True,
+        dir_okay=True,
+        file_okay=False,
+    ),
+) -> None:
+    """
+    Generate 3D patches from microscopy images and their corresponding masks.
+
+    The dataset directory should contain:
+    - An 'images' subdirectory with 3D TIFF files
+    - A 'masks' subdirectory with corresponding mask files
+
+    All patch generation parameters are configured in config.py
+    """
+    # Generate patches using config values
+    generate_patches(dataset_dir=dataset_dir)
+
+
+if __name__ == "__main__":
+    app()
