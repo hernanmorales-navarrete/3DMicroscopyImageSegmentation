@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from src.config import (
     PATCH_SIZE,
-    PATCH_BATCH,
+    BATCH_SIZE,
 )
 from src.microscopy_augmentations import (
     augment_patch_intensity,
@@ -21,7 +21,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
     4. Batching the data
     """
 
-    def __init__(self, data_dir, batch_size=PATCH_BATCH, augmentation="NONE", **kwargs):
+    def __init__(self, data_dir, batch_size=BATCH_SIZE, augmentation="NONE", **kwargs):
         """Initialize the dataset.
 
         Args:

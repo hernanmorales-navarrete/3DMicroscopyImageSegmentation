@@ -26,7 +26,6 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 # VARIABLES
 
 PATCH_SIZE = (64, 64, 64)
-PATCH_BATCH = 1
 PATCH_STEP = 64
 
 # Augmentation flags
@@ -62,7 +61,7 @@ AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
 
 # Training hyperparameters
 LEARNING_RATE = 1e-4
-BATCH_SIZE = 32  # Default Keras batch size
+BATCH_SIZE = 1
 NUM_EPOCHS = 100
 VALIDATION_SPLIT = 0.2
 
