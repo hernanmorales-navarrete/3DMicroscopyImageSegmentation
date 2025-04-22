@@ -136,8 +136,7 @@ def main(
     train_dataset = ImageDataset(
         data_dir=str(data_dir),
         batch_size=BATCH_SIZE,
-        use_standard_augmentation=(augmentation == AugmentationType.STANDARD),
-        use_ours_augmentation=(augmentation == AugmentationType.OURS),
+        augmentation=augmentation.value,
     )
 
     logger.info(f"Creating {model_name} model...")

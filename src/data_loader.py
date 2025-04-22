@@ -4,8 +4,6 @@ import tensorflow as tf
 from src.config import (
     PATCH_SIZE,
     PATCH_BATCH,
-    STANDARD_AUGMENTATION,
-    OURS_AUGMENTATION,
 )
 from src.microscopy_augmentations import (
     augment_patch_intensity,
@@ -23,20 +21,21 @@ class ImageDataset(tf.keras.utils.PyDataset):
     4. Batching the data
     """
 
-    def __init__(self, data_dir, batch_size=PATCH_BATCH, **kwargs):
+    def __init__(self, data_dir, batch_size=PATCH_BATCH, augmentation="NONE", **kwargs):
         """Initialize the dataset.
 
         Args:
             data_dir: Directory containing the dataset with 'images' and 'masks' subdirectories
             batch_size: Number of samples per batch
+            augmentation: Type of augmentation to use
             **kwargs: Additional arguments passed to tf.keras.utils.PyDataset
         """
         super().__init__(**kwargs)
         self.data_dir = data_dir
         self.batch_size = batch_size
-
+        self.augmentation = augmentation
         # Create standard augmentation pipeline if needed
-        if STANDARD_AUGMENTATION:
+        if self.augmentation == "STANDARD":
             self.transform = create_standard_augmentation_pipeline()
 
         # Get file paths
@@ -56,10 +55,10 @@ class ImageDataset(tf.keras.utils.PyDataset):
         Returns:
             Tuple of (augmented_image, augmented_mask)
         """
-        if not STANDARD_AUGMENTATION and not OURS_AUGMENTATION:
+        if self.augmentation == "NONE":
             return image, mask
 
-        if STANDARD_AUGMENTATION:
+        if self.augmentation == "STANDARD":
             # Remove channel dimension for Albumentations
             image_no_channel = np.squeeze(image)
             mask_no_channel = np.squeeze(mask)
@@ -71,7 +70,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
             image = transformed["volume"][..., np.newaxis]
             mask = transformed["mask3d"][..., np.newaxis]
 
-        if OURS_AUGMENTATION:
+        if self.augmentation == "OURS":
             image = augment_patch_intensity(image)
 
         return image, mask
