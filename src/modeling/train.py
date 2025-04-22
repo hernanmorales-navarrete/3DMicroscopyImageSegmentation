@@ -25,7 +25,6 @@ from src.config import (
 )
 from src.data_loader import ImageDataset
 import src.models as models_module
-from src.masks import generate_and_save_patches
 
 
 app = typer.Typer()
