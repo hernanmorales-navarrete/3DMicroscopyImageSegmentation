@@ -39,11 +39,13 @@ class ImageDataset(tf.keras.utils.PyDataset):
             self.transform = create_standard_augmentation_pipeline()
 
         # Get file paths
-        self.image_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "images/*.tif")))
-        self.mask_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "masks/*.tif")))
+        self.image_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "images/**/*.tif")))
+        self.mask_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "masks/**/*.tif")))
 
         if not self.image_paths or not self.mask_paths:
-            raise ValueError("No data found in specified directory")
+            raise ValueError(
+                f"No .tif files found in {data_dir}/images/ or {data_dir}/masks/ subdirectories"
+            )
 
     def _augment_3d_patch(self, image, mask):
         """Apply augmentations to a patch and its mask.
