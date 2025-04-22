@@ -101,7 +101,7 @@ def create_callbacks(model_name: str):
 @app.command()
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to train"),
-    data_dir: Path = typer.Option(PROCESSED_DATA_DIR, help="Directory containing the dataset"),
+    data_dir: Path = typer.Argument(..., help="Directory containing the dataset"),
     enable_reproducibility: bool = typer.Option(
         True, help="Enable reproducibility by setting random seeds"
     ),
