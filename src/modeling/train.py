@@ -153,7 +153,6 @@ def main(
     model.fit(
         train_dataset,
         epochs=NUM_EPOCHS,
-        validation_split=VALIDATION_SPLIT,
         callbacks=callbacks,
         verbose=1,
     )
