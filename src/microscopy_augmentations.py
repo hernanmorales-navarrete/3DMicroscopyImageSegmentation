@@ -155,15 +155,6 @@ def create_standard_augmentation_pipeline():
             # Spatial transform - flips and rotations
             A.CubicSymmetry(p=0.7),
             A.CoarseDropout3D(
-                max_holes=8,
-                max_height=8,
-                max_width=8,
-                max_depth=8,
-                min_holes=4,
-                min_height=4,
-                min_width=4,
-                min_depth=4,
-                fill_value=0,
                 p=0.3,
             ),
         ]
