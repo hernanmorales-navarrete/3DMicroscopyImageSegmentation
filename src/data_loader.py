@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+import tifffile
 from src.config import (
     PATCH_SIZE,
     BATCH_SIZE,
@@ -86,18 +87,20 @@ class ImageDataset(tf.keras.utils.PyDataset):
         Returns:
             Normalized volume of shape (z, y, x, 1) with values in [0, 1]
         """
-        raw_data = tf.io.read_file(path)
-        volume = tf.io.decode_raw(raw_data, tf.uint16)
-        volume = tf.reshape(volume, PATCH_SIZE)
-        volume = volume[..., tf.newaxis]
-        volume = tf.cast(volume, tf.float32)
+        # Read TIFF file using tifffile
+        volume = tifffile.imread(str(path))
+
+        # Add channel dimension if not present
+        if len(volume.shape) == 3:
+            volume = volume[..., np.newaxis]
+
+        # Convert to float32
+        volume = volume.astype(np.float32)
 
         # Min-max normalization
-        volume_min = tf.reduce_min(volume)
-        volume_max = tf.reduce_max(volume)
-        volume_normalized = (volume - volume_min) / (
-            volume_max - volume_min + tf.keras.backend.epsilon()
-        )
+        volume_min = np.min(volume)
+        volume_max = np.max(volume)
+        volume_normalized = (volume - volume_min) / (volume_max - volume_min + np.finfo(float).eps)
 
         return volume_normalized
 
