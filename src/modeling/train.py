@@ -9,7 +9,6 @@ import inspect
 from src.config import (
     MODELS_DIR,
     LOGS_DIR,
-    PROCESSED_DATA_DIR,
     RANDOM_SEED,
     LEARNING_RATE,
     BATCH_SIZE,
@@ -103,18 +102,10 @@ def main(
     model_name: str = typer.Argument(..., help="Name of the model to train"),
     data_dir: Path = typer.Argument(..., help="Directory containing the dataset"),
     enable_reproducibility: bool = typer.Option(
-        True, help="Enable reproducibility by setting random seeds"
+        False, help="Enable reproducibility by setting random seeds"
     ),
-    list_models: bool = typer.Option(False, help="List available models and exit"),
 ):
     """Train a 3D segmentation model."""
-    # List available models if requested
-    if list_models:
-        available_models = get_available_models()
-        logger.info("Available models:")
-        for name in available_models:
-            logger.info(f"  - {name}")
-        return
 
     if enable_reproducibility:
         logger.info(f"Setting random seed to {RANDOM_SEED}")
