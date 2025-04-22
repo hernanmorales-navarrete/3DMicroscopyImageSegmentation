@@ -7,13 +7,13 @@ from datetime import datetime
 import inspect
 from enum import Enum
 import os
-import numpy as np
 from sklearn.model_selection import train_test_split
 
 from src.config import (
     MODELS_DIR,
     LOGS_DIR,
     RANDOM_SEED,
+    VALIDATION_SPLIT,
     LEARNING_RATE,
     BATCH_SIZE,
     NUM_EPOCHS,
@@ -108,7 +108,9 @@ def create_callbacks(model_name: str, augmentation: AugmentationType):
     return callbacks
 
 
-def load_and_split_data(data_dir: Path, validation_split: float = 0.2, random_state: int = None):
+def load_and_split_data(
+    data_dir: Path, validation_split: float = VALIDATION_SPLIT, random_state: int = None
+):
     """Load and split data paths into train and validation sets.
 
     Args:
@@ -133,7 +135,7 @@ def load_and_split_data(data_dir: Path, validation_split: float = 0.2, random_st
 
     # Split the data
     train_image_paths, val_image_paths, train_mask_paths, val_mask_paths = train_test_split(
-        image_paths, mask_paths, test_size=validation_split, random_state=random_state
+        image_paths, mask_paths, test_size=VALIDATION_SPLIT, random_state=random_state
     )
 
     logger.info(
@@ -147,7 +149,6 @@ def load_and_split_data(data_dir: Path, validation_split: float = 0.2, random_st
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to train"),
     data_dir: Path = typer.Argument(..., help="Directory containing the dataset"),
-    validation_split: float = typer.Option(0.2, help="Fraction of data to use for validation"),
     augmentation: AugmentationType = typer.Option(
         AugmentationType.NONE,
         "--augmentation",
@@ -170,7 +171,7 @@ def main(
     logger.info(f"Loading and splitting data from {data_dir}")
     random_state = RANDOM_SEED if enable_reproducibility else None
     train_image_paths, val_image_paths, train_mask_paths, val_mask_paths = load_and_split_data(
-        data_dir, validation_split=validation_split, random_state=random_state
+        data_dir, random_state=random_state
     )
 
     logger.info("Creating datasets...")
