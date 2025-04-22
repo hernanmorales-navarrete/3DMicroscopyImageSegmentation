@@ -16,37 +16,39 @@ class ImageDataset(tf.keras.utils.PyDataset):
     """Dataset class for loading and augmenting 3D microscopy images.
 
     This class handles:
-    1. Loading 3D TIF images and masks
+    1. Loading 3D TIF images and masks from provided paths
     2. Applying standard spatial augmentations (if enabled)
     3. Applying microscopy-specific intensity augmentations (if enabled)
     4. Batching the data
     """
 
-    def __init__(self, data_dir, batch_size=BATCH_SIZE, augmentation="NONE", **kwargs):
+    def __init__(
+        self, image_paths, mask_paths, batch_size=BATCH_SIZE, augmentation="NONE", **kwargs
+    ):
         """Initialize the dataset.
 
         Args:
-            data_dir: Directory containing the dataset with 'images' and 'masks' subdirectories
+            image_paths: List of paths to image files
+            mask_paths: List of paths to corresponding mask files
             batch_size: Number of samples per batch
             augmentation: Type of augmentation to use
             **kwargs: Additional arguments passed to tf.keras.utils.PyDataset
         """
         super().__init__(**kwargs)
-        self.data_dir = data_dir
+        self.image_paths = image_paths
+        self.mask_paths = mask_paths
         self.batch_size = batch_size
         self.augmentation = augmentation
+
         # Create standard augmentation pipeline if needed
         if self.augmentation == "STANDARD":
             self.transform = create_standard_augmentation_pipeline()
 
-        # Get file paths
-        self.image_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "images/**/*.tif")))
-        self.mask_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "masks/**/*.tif")))
-
         if not self.image_paths or not self.mask_paths:
-            raise ValueError(
-                f"No .tif files found in {data_dir}/images/ or {data_dir}/masks/ subdirectories"
-            )
+            raise ValueError("No image or mask paths provided")
+
+        if len(self.image_paths) != len(self.mask_paths):
+            raise ValueError("Number of image paths must match number of mask paths")
 
     def _augment_3d_patch(self, image, mask):
         """Apply augmentations to a patch and its mask.
@@ -141,7 +143,8 @@ class ImageDataset(tf.keras.utils.PyDataset):
 # Example usage
 if __name__ == "__main__":
     dataset = ImageDataset(
-        data_dir="path/to/data",
+        image_paths=["path/to/image1.tif", "path/to/image2.tif"],
+        mask_paths=["path/to/mask1.tif", "path/to/mask2.tif"],
         batch_size=32,
         workers=4,
         use_multiprocessing=True,

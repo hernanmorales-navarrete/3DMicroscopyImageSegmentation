@@ -6,6 +6,9 @@ import typer
 from datetime import datetime
 import inspect
 from enum import Enum
+import os
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 from src.config import (
     MODELS_DIR,
@@ -92,7 +95,7 @@ def create_callbacks(model_name: str, augmentation: AugmentationType):
     callbacks.append(early_stopping)
 
     # Model checkpoint callback
-    checkpoint_path = checkpoint_dir / "E{epoch:02d}_L{val_loss:.4f}.h5"
+    checkpoint_path = checkpoint_dir / "{epoch:02d}_{val_loss:.4f}.h5"
 
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
         str(checkpoint_path),
@@ -105,10 +108,46 @@ def create_callbacks(model_name: str, augmentation: AugmentationType):
     return callbacks
 
 
+def load_and_split_data(data_dir: Path, validation_split: float = 0.2, random_state: int = None):
+    """Load and split data paths into train and validation sets.
+
+    Args:
+        data_dir: Directory containing the dataset
+        validation_split: Fraction of data to use for validation
+        random_state: Random state for reproducibility
+
+    Returns:
+        Tuple of (train_image_paths, val_image_paths, train_mask_paths, val_mask_paths)
+    """
+    # Get all file paths
+    image_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "images/**/*.tif")))
+    mask_paths = sorted(tf.io.gfile.glob(os.path.join(data_dir, "masks/**/*.tif")))
+
+    if not image_paths or not mask_paths:
+        raise ValueError(
+            f"No .tif files found in {data_dir}/images/ or {data_dir}/masks/ subdirectories"
+        )
+
+    if len(image_paths) != len(mask_paths):
+        raise ValueError("Number of images does not match number of masks")
+
+    # Split the data
+    train_image_paths, val_image_paths, train_mask_paths, val_mask_paths = train_test_split(
+        image_paths, mask_paths, test_size=validation_split, random_state=random_state
+    )
+
+    logger.info(
+        f"Found {len(train_image_paths)} training samples and {len(val_image_paths)} validation samples"
+    )
+
+    return train_image_paths, val_image_paths, train_mask_paths, val_mask_paths
+
+
 @app.command()
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to train"),
     data_dir: Path = typer.Argument(..., help="Directory containing the dataset"),
+    validation_split: float = typer.Option(0.2, help="Fraction of data to use for validation"),
     augmentation: AugmentationType = typer.Option(
         AugmentationType.NONE,
         "--augmentation",
@@ -127,11 +166,26 @@ def main(
 
     logger.info(f"Using {augmentation.value} augmentation")
 
-    logger.info("Loading dataset...")
+    # Load and split the data
+    logger.info(f"Loading and splitting data from {data_dir}")
+    random_state = RANDOM_SEED if enable_reproducibility else None
+    train_image_paths, val_image_paths, train_mask_paths, val_mask_paths = load_and_split_data(
+        data_dir, validation_split=validation_split, random_state=random_state
+    )
+
+    logger.info("Creating datasets...")
     train_dataset = ImageDataset(
-        data_dir=str(data_dir),
+        image_paths=train_image_paths,
+        mask_paths=train_mask_paths,
         batch_size=BATCH_SIZE,
         augmentation=augmentation.value,
+    )
+
+    val_dataset = ImageDataset(
+        image_paths=val_image_paths,
+        mask_paths=val_mask_paths,
+        batch_size=BATCH_SIZE,
+        augmentation="NONE",  # No augmentation for validation
     )
 
     logger.info(f"Creating {model_name} model...")
@@ -151,6 +205,7 @@ def main(
     logger.info("Starting training...")
     model.fit(
         train_dataset,
+        validation_data=val_dataset,
         epochs=NUM_EPOCHS,
         callbacks=callbacks,
         verbose=1,
