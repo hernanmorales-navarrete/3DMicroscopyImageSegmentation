@@ -11,11 +11,15 @@ import tifffile
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 
-from src.config import FIGURES_DIR, PROCESSED_DATA_DIR
-from src.metrics import evaluate_patch
+from src.utils import configure_gpu
+from src.config import FIGURES_DIR, PROCESSED_DATA_DIR, BATCH_SIZE
+from src.metrics import evaluate_patch, compute_metrics
 from src.data_loader import ImageDataset
 
 app = typer.Typer()
+
+# Configure GPU at startup
+configure_gpu()
 
 
 def load_deep_models(models_path):
@@ -86,6 +90,7 @@ def evaluate_methods(image_paths, mask_paths, deep_models):
     """
     from concurrent.futures import ProcessPoolExecutor
     import multiprocessing
+    import numpy as np
 
     all_results = []
 
@@ -110,25 +115,37 @@ def evaluate_methods(image_paths, mask_paths, deep_models):
                 logger.error(f"Error processing classical methods: {e}")
                 continue
 
-    # Process deep learning models sequentially (can't be parallelized due to GPU usage)
+    # Process deep learning models in batches
     if deep_models:
         logger.info("Processing deep learning models...")
-        for img_path, mask_path in tqdm(
-            zip(image_paths, mask_paths),
-            total=len(image_paths),
-            desc="Processing deep learning models",
-        ):
-            patch = tifffile.imread(str(img_path))
-            mask = tifffile.imread(str(mask_path))
+        n_samples = len(image_paths)
 
-            for model_name, model in deep_models.items():
+        for model_name, model in deep_models.items():
+            for i in tqdm(range(0, n_samples, BATCH_SIZE), desc=f"Processing {model_name}"):
+                batch_slice = slice(i, min(i + BATCH_SIZE, n_samples))
+                batch_images = [tifffile.imread(str(p)) for p in image_paths[batch_slice]]
+                batch_masks = [tifffile.imread(str(p)) for p in mask_paths[batch_slice]]
+
                 try:
-                    metrics = evaluate_patch(patch, mask, model=model)
-                    metrics["method"] = f"Deep_{model_name}"
-                    metrics["image_path"] = str(img_path)
-                    all_results.append(metrics)
+                    # Stack images into a batch
+                    batch_data = np.stack(batch_images)[..., np.newaxis]
+                    # Predict on batch
+                    batch_preds = model.predict(batch_data, verbose=0)
+                    batch_preds = (batch_preds > 0.5).astype(np.uint8)
+
+                    # Evaluate each prediction in the batch
+                    for j, (pred, mask, img_path) in enumerate(
+                        zip(batch_preds, batch_masks, image_paths[batch_slice])
+                    ):
+                        # Ensure both pred and mask are binary (0 or 1)
+                        pred_binary = (pred[..., 0] > 0).astype(np.uint8)
+                        mask_binary = (mask > 0).astype(np.uint8)
+                        metrics = compute_metrics(mask_binary, pred_binary)
+                        metrics["method"] = f"Deep_{model_name}"
+                        metrics["image_path"] = str(img_path)
+                        all_results.append(metrics)
                 except Exception as e:
-                    logger.error(f"Error processing deep learning model {model_name}: {e}")
+                    logger.error(f"Error processing batch for {model_name}: {e}")
                     continue
 
     return pd.DataFrame(all_results)
@@ -143,7 +160,7 @@ def plot_violin(df, metrics, output_path):
         output_path: Path to save plots
     """
     # Set style
-    plt.style.use("seaborn")
+    sns.set_style("whitegrid")
 
     # Calculate number of rows and columns for subplots
     n_metrics = len(metrics)
