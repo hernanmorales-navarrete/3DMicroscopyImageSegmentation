@@ -99,7 +99,7 @@ def create_callbacks(model_name: str, augmentation: AugmentationType):
     callbacks.append(early_stopping)
 
     # Model checkpoint callback
-    checkpoint_path = checkpoint_dir / "{epoch:02d}_{val_loss:.4f}.h5"
+    checkpoint_path = checkpoint_dir / "best_model.h5"
 
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
         str(checkpoint_path),
