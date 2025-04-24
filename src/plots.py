@@ -336,9 +336,6 @@ def main(
     summary_df = create_summary_table(results_df)
     summary_df.to_csv(output_dir / "metrics_summary.csv")
 
-    # Also save detailed results
-    results_df.to_csv(output_dir / "detailed_results.csv")
-
     logger.success("Plot generation complete!")
 
 
