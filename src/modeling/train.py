@@ -165,7 +165,7 @@ def main(
         help="Path to PSF file for microscopy augmentations",
     ),
     enable_reproducibility: bool = typer.Option(
-        False, help="Enable reproducibility by setting random seeds"
+        True, help="Enable reproducibility by setting random seeds"
     ),
 ):
     """Train a 3D segmentation model with optional augmentation."""
