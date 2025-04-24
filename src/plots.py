@@ -65,7 +65,7 @@ def evaluate_single_pair(image_path, mask_path, classical_methods_only=True):
     mask = tifffile.imread(str(mask_path))
 
     results = []
-    classical_methods = ["otsu", "adaptive_mean", "adaptive_gaussian", "binary", "frangi"]
+    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
 
     # Evaluate classical methods
     for method in classical_methods:
