@@ -181,6 +181,9 @@ def main(
     if psf_path and psf_path.exists():
         intensity_params.update({"use_psf": True, "psf_path": str(psf_path)})
         logger.info(f"Using PSF file: {psf_path}")
+    else:
+        intensity_params.update({"use_psf": False})
+        logger.warning("No PSF file provided, using default parameters")
 
     # Load and split the data
     logger.info(f"Loading and splitting data from {data_dir}")
