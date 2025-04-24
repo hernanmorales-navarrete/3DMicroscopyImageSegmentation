@@ -12,9 +12,8 @@ from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 
 from src.utils import configure_gpu
-from src.config import FIGURES_DIR, PROCESSED_DATA_DIR, BATCH_SIZE
+from src.config import FIGURES_DIR, BATCH_SIZE
 from src.metrics import evaluate_patch, compute_metrics
-from src.data_loader import ImageDataset
 
 app = typer.Typer()
 
@@ -88,10 +87,6 @@ def evaluate_methods(image_paths, mask_paths, deep_models):
     Returns:
         DataFrame with results
     """
-    from concurrent.futures import ProcessPoolExecutor
-    import multiprocessing
-    import numpy as np
-
     all_results = []
 
     # Number of workers (leave one core free for system processes)

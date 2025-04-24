@@ -1,9 +1,7 @@
-import os
 import numpy as np
 import tensorflow as tf
 import tifffile
 from src.config import (
-    PATCH_SIZE,
     BATCH_SIZE,
 )
 from src.microscopy_augmentations import (
