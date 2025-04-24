@@ -3,6 +3,7 @@ import tensorflow as tf
 import tifffile
 from src.config import (
     BATCH_SIZE,
+    INTENSITY_PARAMS,
 )
 from src.microscopy_augmentations import (
     augment_patch_intensity,
@@ -21,15 +22,22 @@ class ImageDataset(tf.keras.utils.PyDataset):
     """
 
     def __init__(
-        self, image_paths, mask_paths, batch_size=BATCH_SIZE, augmentation="NONE", **kwargs
+        self,
+        image_paths,
+        mask_paths,
+        batch_size=BATCH_SIZE,
+        augmentation="NONE",
+        intensity_params=None,
+        **kwargs,
     ):
         """Initialize the dataset.
 
         Args:
             image_paths: List of paths to image files
-            mask_paths: List of paths to corresponding mask files
+            mask_paths: List of corresponding mask files
             batch_size: Number of samples per batch
             augmentation: Type of augmentation to use
+            intensity_params: Parameters for microscopy-specific intensity augmentations
             **kwargs: Additional arguments passed to tf.keras.utils.PyDataset
         """
         super().__init__(**kwargs)
@@ -37,6 +45,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
         self.mask_paths = mask_paths
         self.batch_size = batch_size
         self.augmentation = augmentation
+        self.intensity_params = intensity_params or INTENSITY_PARAMS
 
         # Create standard augmentation pipeline if needed
         if self.augmentation == "STANDARD":
@@ -74,7 +83,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
             mask = transformed["mask3d"][..., np.newaxis]
 
         if self.augmentation == "OURS":
-            image = augment_patch_intensity(image)
+            image = augment_patch_intensity(image, params=self.intensity_params)
 
         return image, mask
 

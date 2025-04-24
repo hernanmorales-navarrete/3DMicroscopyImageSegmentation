@@ -26,6 +26,7 @@ from src.config import (
     LOSS_FUNCTION,
     METRICS,
     TENSORBOARD_UPDATE_FREQ,
+    INTENSITY_PARAMS,
 )
 from src.data_loader import ImageDataset
 import src.models as models_module
@@ -112,9 +113,7 @@ def create_callbacks(model_name: str, augmentation: AugmentationType):
     return callbacks
 
 
-def load_and_split_data(
-    data_dir: Path, validation_split: float = VALIDATION_SPLIT, random_state: int = None
-):
+def load_and_split_data(data_dir: Path, random_state: int = None):
     """Load and split data paths into train and validation sets.
 
     Args:
@@ -159,6 +158,12 @@ def main(
         "-a",
         help="Type of augmentation to use",
     ),
+    psf_path: Path = typer.Option(
+        None,
+        "--psf",
+        "-p",
+        help="Path to PSF file for microscopy augmentations",
+    ),
     enable_reproducibility: bool = typer.Option(
         False, help="Enable reproducibility by setting random seeds"
     ),
@@ -170,6 +175,12 @@ def main(
         set_random_seed()
 
     logger.info(f"Using {augmentation.value} augmentation")
+
+    # Configure PSF parameters
+    intensity_params = INTENSITY_PARAMS.copy()
+    if psf_path and psf_path.exists():
+        intensity_params.update({"use_psf": True, "psf_path": str(psf_path)})
+        logger.info(f"Using PSF file: {psf_path}")
 
     # Load and split the data
     logger.info(f"Loading and splitting data from {data_dir}")
@@ -184,6 +195,7 @@ def main(
         mask_paths=train_mask_paths,
         batch_size=BATCH_SIZE,
         augmentation=augmentation.value,
+        intensity_params=intensity_params,
     )
 
     val_dataset = ImageDataset(
