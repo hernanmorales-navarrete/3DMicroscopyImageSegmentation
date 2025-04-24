@@ -66,7 +66,7 @@ def simulate_local_variations(shape, binnings=[1, 2, 4, 8], scale=5):
     return result
 
 
-def augment_patch_intensity(patch, params=INTENSITY_PARAMS):
+def augment_patch_intensity(patch, params):
     """Apply intensity-based augmentations to a 3D patch.
 
     This function applies various microscopy-specific augmentations:
