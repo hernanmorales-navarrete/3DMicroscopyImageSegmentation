@@ -4,9 +4,9 @@ import numpy as np
 from loguru import logger
 import typer
 import tifffile
-from collections import defaultdict
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
+from patchify import unpatchify
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
 from src.plots import load_deep_models
@@ -19,13 +19,13 @@ def extract_patch_info(filename):
     """Extract information from patch filename.
 
     Args:
-        filename: Patch filename (e.g. 'image1_512_512_128_z50_y100_x150.tif')
+        filename: Patch filename (e.g. 'image1_orig_512_512_128_pad_520_520_130_npatches_4_8_8_patch_0000.tif')
 
     Returns:
-        tuple: (image_name, original_shape, (z, y, x) position)
+        tuple: (image_name, original_shape, padded_shape, n_patches)
     """
     # Extract information using regex
-    pattern = r"(.+)_(\d+)_(\d+)_(\d+)_z(\d+)_y(\d+)_x(\d+)\.tif"
+    pattern = r"(.+)_orig_(\d+)_(\d+)_(\d+)(?:_pad_(\d+)_(\d+)_(\d+))?_npatches_(\d+)_(\d+)_(\d+)_patch_\d+\.tif"
     match = re.match(pattern, filename.name)
 
     if not match:
@@ -33,72 +33,31 @@ def extract_patch_info(filename):
 
     image_name = match.group(1)
     orig_shape = (int(match.group(2)), int(match.group(3)), int(match.group(4)))
-    position = (int(match.group(5)), int(match.group(6)), int(match.group(7)))
 
-    return image_name, orig_shape, position
+    # Get padded shape if it exists, otherwise use original shape
+    if match.group(5):
+        padded_shape = (int(match.group(5)), int(match.group(6)), int(match.group(7)))
+        n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
+    else:
+        padded_shape = orig_shape
+        n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
 
-
-def calculate_padded_shape(original_shape):
-    """Calculate shape that will be evenly divisible by step size.
-
-    Args:
-        original_shape: Original image shape (z, y, x)
-
-    Returns:
-        tuple: Shape padded to next size that's compatible with patch size and step
-    """
-    padded_shape = []
-    for dim, patch_size in zip(original_shape, PATCH_SIZE):
-        # If dimension is not compatible with patch size and step
-        if (dim - patch_size) % PATCH_STEP != 0:
-            # Calculate next compatible size
-            n_steps = (dim - patch_size + PATCH_STEP) // PATCH_STEP
-            new_dim = patch_size + n_steps * PATCH_STEP
-            padded_shape.append(new_dim)
-        else:
-            padded_shape.append(dim)
-
-    return tuple(padded_shape)
-
-
-def reconstruct_image(patches_dict, original_shape):
-    """Reconstruct full image from patches.
-
-    Args:
-        patches_dict: Dictionary mapping (z,y,x) position to patch data
-        original_shape: Shape of the original image
-
-    Returns:
-        Reconstructed image array
-    """
-    # Calculate padded shape that will be compatible with patch size and step
-    padded_shape = calculate_padded_shape(original_shape)
-
-    # Create padded output array
-    reconstructed = np.zeros(padded_shape, dtype=np.uint8)
-
-    # Place each patch in its position
-    for position, patch in patches_dict.items():
-        z, y, x = position
-        reconstructed[z : z + PATCH_SIZE[0], y : y + PATCH_SIZE[1], x : x + PATCH_SIZE[2]] = patch
-
-    # Cut back to original shape
-    return reconstructed[: original_shape[0], : original_shape[1], : original_shape[2]]
+    return image_name, orig_shape, padded_shape, n_patches
 
 
 def process_single_patch(args):
     """Process a single patch for classical methods in parallel execution.
 
     Args:
-        args: Tuple of (img_path, method)
+        args: Tuple of (img_path, patch_idx, method)
 
     Returns:
-        Tuple of (image_name, orig_shape, position, prediction)
+        Tuple of (image_name, orig_shape, padded_shape, n_patches, patch_idx, prediction)
     """
-    img_path, method = args
+    img_path, patch_idx, method = args
 
     # Extract patch information
-    image_name, orig_shape, position = extract_patch_info(img_path)
+    image_name, orig_shape, padded_shape, n_patches = extract_patch_info(img_path)
 
     # Read patch
     patch = tifffile.imread(str(img_path))
@@ -106,7 +65,7 @@ def process_single_patch(args):
     # Get prediction using predict_patch (classical method only)
     pred = predict_patch(patch, model=None, method=method)
 
-    return image_name, orig_shape, position, pred
+    return image_name, orig_shape, padded_shape, n_patches, patch_idx, pred
 
 
 def predict_patches(image_paths, method="otsu", model=None):
@@ -118,7 +77,7 @@ def predict_patches(image_paths, method="otsu", model=None):
         model: Deep learning model (if method is None)
 
     Returns:
-        Dictionary mapping image names to (original_shape, predictions) tuple
+        Dictionary mapping image names to (original_shape, padded_shape, n_patches, predictions) tuple
     """
     # Dictionary to store patches for each original image
     image_predictions = {}
@@ -127,12 +86,13 @@ def predict_patches(image_paths, method="otsu", model=None):
         # Sequential processing for deep learning models
         logger.info("Using sequential processing for deep learning model")
         for img_path in image_paths:
-            # Extract patch information
-            image_name, orig_shape, position = extract_patch_info(img_path)
+            # Extract patch information and patch index
+            image_name, orig_shape, padded_shape, n_patches = extract_patch_info(img_path)
+            patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
 
             # Initialize predictions dictionary for this image if needed
             if image_name not in image_predictions:
-                image_predictions[image_name] = (orig_shape, {})
+                image_predictions[image_name] = (orig_shape, padded_shape, n_patches, [])
 
             # Read patch
             patch = tifffile.imread(str(img_path))
@@ -141,14 +101,17 @@ def predict_patches(image_paths, method="otsu", model=None):
             pred = predict_patch(patch, model=model, method=method)
 
             # Store prediction
-            image_predictions[image_name][1][position] = pred
+            image_predictions[image_name][3].append((patch_idx, pred))
     else:
         # Parallel processing for classical methods
         n_workers = max(1, multiprocessing.cpu_count() - 1)
         logger.info(f"Using {n_workers} workers for parallel processing with {method} method")
 
         # Prepare arguments for parallel processing
-        process_args = [(img_path, method) for img_path in image_paths]
+        process_args = []
+        for img_path in image_paths:
+            patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
+            process_args.append((img_path, patch_idx, method))
 
         # Process patches in parallel
         with ProcessPoolExecutor(max_workers=n_workers) as executor:
@@ -160,14 +123,25 @@ def predict_patches(image_paths, method="otsu", model=None):
 
             # Process results as they complete
             for future in futures:
-                image_name, orig_shape, position, pred = future.result()
+                image_name, orig_shape, padded_shape, n_patches, patch_idx, pred = future.result()
 
                 # Initialize predictions dictionary for this image if needed
                 if image_name not in image_predictions:
-                    image_predictions[image_name] = (orig_shape, {})
+                    image_predictions[image_name] = (orig_shape, padded_shape, n_patches, [])
 
                 # Store prediction
-                image_predictions[image_name][1][position] = pred
+                image_predictions[image_name][3].append((patch_idx, pred))
+
+    # Sort predictions by patch index for each image
+    for image_name in image_predictions:
+        image_predictions[image_name][3].sort(key=lambda x: x[0])
+        # Convert to just the predictions array
+        image_predictions[image_name] = (
+            image_predictions[image_name][0],  # orig_shape
+            image_predictions[image_name][1],  # padded_shape
+            image_predictions[image_name][2],  # n_patches
+            np.array([p[1] for p in image_predictions[image_name][3]]),  # predictions array
+        )
 
     return image_predictions
 
@@ -205,13 +179,26 @@ def main(
         predictions = predict_patches(image_paths, method=method)
 
         # Reconstruct and save each image
-        for image_name, (orig_shape, patches) in predictions.items():
-            # Reconstruct full image
-            full_image = reconstruct_image(patches, orig_shape)
+        for image_name, (
+            orig_shape,
+            padded_shape,
+            n_patches,
+            patches_array,
+        ) in predictions.items():
+            # Reshape patches array to match unpatchify requirements (n_patches_z, n_patches_y, n_patches_x, *patch_size)
+            patches_reshaped = patches_array.reshape(
+                n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
+            )
+
+            # Reconstruct full image using unpatchify with padded shape
+            reconstructed = unpatchify(patches_reshaped, padded_shape)
+
+            # Crop back to original size
+            reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
 
             # Save reconstructed image
             output_path = output_dir / f"{image_name}_{method}.tif"
-            tifffile.imwrite(str(output_path), full_image)
+            tifffile.imwrite(str(output_path), reconstructed)
 
     # Process deep learning models
     for model_name, model in deep_models.items():
@@ -219,13 +206,26 @@ def main(
         predictions = predict_patches(image_paths, model=model)
 
         # Reconstruct and save each image
-        for image_name, (orig_shape, patches) in predictions.items():
-            # Reconstruct full image
-            full_image = reconstruct_image(patches, orig_shape)
+        for image_name, (
+            orig_shape,
+            padded_shape,
+            n_patches,
+            patches_array,
+        ) in predictions.items():
+            # Reshape patches array to match unpatchify requirements (n_patches_z, n_patches_y, n_patches_x, *patch_size)
+            patches_reshaped = patches_array.reshape(
+                n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
+            )
+
+            # Reconstruct full image using unpatchify with padded shape
+            reconstructed = unpatchify(patches_reshaped, padded_shape)
+
+            # Crop back to original size
+            reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
 
             # Save reconstructed image
             output_path = output_dir / f"{image_name}_{model_name}.tif"
-            tifffile.imwrite(str(output_path), full_image)
+            tifffile.imwrite(str(output_path), reconstructed)
 
     logger.success("Prediction and reconstruction complete!")
 
