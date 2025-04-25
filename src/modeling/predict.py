@@ -125,12 +125,35 @@ def main(
     models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
     output_dir: Path = typer.Option(REPORTS_DIR, help="Directory to save predictions"),
 ):
-    """Generate predictions using deep learning on patches and classical methods on complete images."""
+    """Generate predictions using classical methods on complete images and then deep learning on patches."""
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Process deep learning methods with patches
+    # Process classical methods with complete images first
+    complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
+    if not complete_image_paths:
+        raise ValueError(f"No .tif files found in {complete_images_dir}/images/")
+
+    logger.info(f"Found {len(complete_image_paths)} complete images for classical methods")
+
+    # Classical methods to try
+    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
+
+    # Process each complete image with classical methods
+    for image_path in complete_image_paths:
+        image_name = image_path.stem
+        logger.info(f"Processing image: {image_name}")
+
+        for method in classical_methods:
+            logger.info(f"Applying {method} method")
+            prediction = predict_complete_image(image_path, method)
+
+            # Save prediction
+            output_path = output_dir / f"{image_name}_{method}.tif"
+            tifffile.imwrite(str(output_path), prediction)
+
+    # Then process deep learning methods with patches
     patch_paths = sorted(patches_dir.glob("images/**/*.tif"))
     if not patch_paths:
         raise ValueError(f"No .tif files found in {patches_dir}/images/")
@@ -163,29 +186,6 @@ def main(
             # Save reconstructed image
             output_path = output_dir / f"{image_name}_{model_name}.tif"
             tifffile.imwrite(str(output_path), reconstructed)
-
-    # Process classical methods with complete images
-    complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
-    if not complete_image_paths:
-        raise ValueError(f"No .tif files found in {complete_images_dir}/images/")
-
-    logger.info(f"Found {len(complete_image_paths)} complete images for classical methods")
-
-    # Classical methods to try
-    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
-
-    # Process each complete image with classical methods
-    for image_path in complete_image_paths:
-        image_name = image_path.stem
-        logger.info(f"Processing image: {image_name}")
-
-        for method in classical_methods:
-            logger.info(f"Applying {method} method")
-            prediction = predict_complete_image(image_path, method)
-
-            # Save prediction
-            output_path = output_dir / f"{image_name}_{method}.tif"
-            tifffile.imwrite(str(output_path), prediction)
 
     logger.success("Prediction and reconstruction complete!")
 
