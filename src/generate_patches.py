@@ -185,11 +185,9 @@ def main(
         dir_okay=True,
         file_okay=False,
     ),
-    pad_images: bool = typer.Option(
-        False,
-        "--pad",
-        "-p",
-        help="Pad images to ensure proper reconstruction with unpatchify",
+    pad_images: bool = typer.Argument(
+        ...,
+        help="Whether to pad images to ensure proper reconstruction with unpatchify",
     ),
 ) -> None:
     """
