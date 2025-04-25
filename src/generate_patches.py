@@ -91,50 +91,39 @@ def generate_patches(
             img_patches_subdir.mkdir(exist_ok=True, parents=True)
             mask_patches_subdir.mkdir(exist_ok=True, parents=True)
 
-            # Calculate number of patches in each dimension
-            n_z, n_y, n_x = img_patches.shape[:3]
+            # Flatten the patches arrays
+            img_patches_flat = img_patches.reshape(-1, *patch_size)
+            mask_patches_flat = mask_patches.reshape(-1, *patch_size)
+            total_patches = len(img_patches_flat)
 
-            # Save patches with nested progress bars
-            patch_idx = 0
-            # Z-axis progress bar
-            z_pbar = tqdm(range(n_z), desc=f"Z-axis ({img_path.stem})", position=1, leave=False)
-            for z in z_pbar:
-                # Y-axis progress bar
-                y_pbar = tqdm(range(n_y), desc="Y-axis", position=2, leave=False)
-                for y in y_pbar:
-                    # X-axis progress bar
-                    x_pbar = tqdm(range(n_x), desc="X-axis", position=3, leave=False)
-                    for x in x_pbar:
-                        # Calculate actual position in original image
-                        pos_z = z * step_size
-                        pos_y = y * step_size
-                        pos_x = x * step_size
+            # Save patches with a simple progress bar
+            with tqdm(
+                total=total_patches,
+                desc=f"Saving patches for {img_path.stem}",
+                position=1,
+                leave=False,
+            ) as pbar:
+                for patch_idx in range(total_patches):
+                    # Create filename with patch number and original size info
+                    patch_filename = (
+                        f"{img_path.stem}_"
+                        f"{orig_shape[0]}_{orig_shape[1]}_{orig_shape[2]}_"
+                        f"patch_{patch_idx:04d}.tif"
+                    )
 
-                        # Create filename with position and original size info
-                        # Format: name_origsize_z_y_x_pos_z_y_x.tif
-                        # Example: image1_512_512_128_z50_y100_x150.tif
-                        patch_filename = (
-                            f"{img_path.stem}_"
-                            f"{orig_shape[0]}_{orig_shape[1]}_{orig_shape[2]}_"
-                            f"z{pos_z}_y{pos_y}_x{pos_x}.tif"
-                        )
+                    # Save image patch
+                    img_patch_path = img_patches_subdir / patch_filename
+                    tifffile.imwrite(str(img_patch_path), img_patches_flat[patch_idx])
 
-                        # Save image patch
-                        img_patch_path = img_patches_subdir / patch_filename
-                        tifffile.imwrite(str(img_patch_path), img_patches[z, y, x])
+                    # Save mask patch
+                    mask_patch_path = mask_patches_subdir / patch_filename
+                    tifffile.imwrite(str(mask_patch_path), mask_patches_flat[patch_idx])
 
-                        # Save mask patch
-                        mask_patch_path = mask_patches_subdir / patch_filename
-                        tifffile.imwrite(str(mask_patch_path), mask_patches[z, y, x])
+                    pbar.update(1)
 
-                        patch_idx += 1
-
-                        # Update progress bar descriptions with current positions
-                        x_pbar.set_description(f"X-axis (pos: {pos_x})")
-                    y_pbar.set_description(f"Y-axis (pos: {pos_y})")
-                z_pbar.set_description(f"Z-axis (pos: {pos_z})")
-
-            logger.info(f"Generated {patch_idx} patches of size {patch_size} for {img_path.name}")
+            logger.info(
+                f"Generated {total_patches} patches of size {patch_size} for {img_path.name}"
+            )
 
         except Exception as e:
             logger.error(f"Error processing {img_path}: {e}")
