@@ -1,158 +1,172 @@
-# 3D_Microscopy_Image_Segmentation
-Python code for fluorescence microscopy image segmentation using deep learning. Includes optimized models for cellular structure segmentation, data preprocessing utilities, and methods to generate artificial images simulating microscopy data for training. Enhances model performance by augmenting real-world datasets.
+# 3D Microscopy Image Segmentation
 
+This software provides tools for training and evaluating 3D microscopy image segmentation models using both classical and deep learning approaches.
 
-## Table of Contents
+## Command Line Interface (CLI) Guide
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Features](#features)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
-- [Acknowledgements](#acknowledgements)
+This guide explains how to use each command-line tool in detail. Before running any command, make sure you're in the project's root directory.
 
+### 1. Generate Patches (`generate_patches.py`)
 
-## Instalation
+This tool splits your 3D microscopy images into smaller patches for processing.
 
-The dependencies in requirements.txt are needed in order to run the functions in a Jupyter Notebook. Install Conda and create a new environment called "img_seg_env" with Python 3.10: 
+```bash
+python src/generate_patches.py PATH_TO_DATASET USE_PADDING
 
-```
-conda create -n img_seg_env python=3.10
+Required arguments:
+- PATH_TO_DATASET: Full path to your dataset directory
+- USE_PADDING: Either 'true' or 'false' (lowercase)
 ```
 
-Enter the environment and install the dependencies in requirements.txt: 
+**Important Note About Padding:**
+- For training: Use `false` (no padding needed)
+- For prediction/reconstruction: Use `true` (padding required for proper reconstruction)
 
-```
-conda activate img_seg_env
-pip install -r requirements.txt
-```
+Example commands:
+```bash
+# For training data
+python src/generate_patches.py /home/user/microscopy_data false
 
-You have successfully installed the packages! In order to run the functions, it is necessary to enter Jupyter Lab: 
-
-```
-jupyter lab 
-```
-
-Whence links will be created for you to open Jupyter Lab in your browser. 
-
-## Usage
-
-### Train 
-
-Import TF and stop TF to use all GPU memory. 
-
-```
-import tensorflow as tf
-
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        print(e)
-
-strategy = tf.distribute.MirroredStrategy() #Include this line if you want your models to be trained in different GPU's
+# For prediction data
+python src/generate_patches.py /home/user/microscopy_data true
 ```
 
-Import the UNET3D and AttentionUNET3D models, and functions to create and train the model. 
-
-
+Your input dataset must have this structure:
 ```
-from data_loader.create_dataset import create_tf_datasets
-from models.attention_unet import AttentionUNet3D
-from models.unet import UNet3D
-from trainer.train import train_model
-```
-
-The dataset you are using must be of the form: 
-
-- dataset
-    - training_data
-        - images
-            - img1.tif
-            - img2.tif
-        - masks
-            - img1.tif
-            - img2.tif
-    - test_data
-        - images
-            - img1.tif
-            - img2.tif
-        - masks
-            - img1.tif
-            - img2.tif
-
-Given this dataset, we create the training and validation set provided that we have the training_data. The parameters are detailed: 
-
-- train_dir: relative path to the training_data folder. 
-- percent_val: validation data size. 
-- patch_shape: size of 3D patches
-- patch_step: overlapping between patches. A fewer value will create overlapping patches. 
-- random_state: seed
-
-
-```
-train_dataset, val_dataset = create_tf_datasets(
-    train_dir, 
-    percent_val=0.2, 
-    patch_shape=(64, 64, 64), 
-    patch_step=64,
-    random_state = 42
-)
-
+dataset/
+├── images/
+│   ├── image1.tif
+│   └── image2.tif
+└── masks/
+    ├── image1.tif
+    └── image2.tif
 ```
 
-Then we call the function to train the model
+### 2. Train Models (`train.py`)
 
-```
-train_model(
-        train_dataset = train_dataset, 
-        val_dataset = val_dataset, 
-        model = UNet3D().build_model(input_shape=(64, 64, 64, 1)),
-        optimizer = 'adam', 
-        loss = 'binary_crossentropy',
-        metrics=['accuracy', 'precision', 'recall'],
-        epochs = 50,
-        batch_size = 16, 
-        filename="bc_unet3d.keras",
-        model_name="bc_unet3d"
-    )
-```
+Train a segmentation model with various options:
 
-The parameters are: 
+```bash
+python src/modeling/train.py MODEL_NAME DATA_DIR [OPTIONS]
 
-- train_dataset and val_dataset: training and validation split from last function. 
-- model: build the model with UNet3D or AttentionUNet3D, and the patch size. 
-- optimizer: select an optimizer (https://www.tensorflow.org/api_docs/python/tf/keras/optimizers)
-- loss: select a loss function (https://www.tensorflow.org/api_docs/python/tf/keras/losses)
-- metrics: give an array of metrics (https://www.tensorflow.org/api_docs/python/tf/keras/metrics)
-- epochs: number of epochs of training
-- batch_size: number of batch size. The greater the value, the GPU memory increases. 
-- filename: name of the saved model. The function always saved the best model. 
-- model_name: name to be displaye in Tensorboard
+Required arguments:
+- MODEL_NAME: Name of the model to use (UNet3D or AttentionUNet3D)
+- DATA_DIR: Path to directory containing training patches
 
-If you want to train the model with different GPUs, use strategy.scope() as scope for the function. 
-
-```
-with strategy.scope():
-    train_model(
-        train_dataset = train_dataset, 
-        val_dataset = val_dataset, 
-        model = UNet3D().build_model(), 
-        optimizer = 'adam', 
-        loss = 'binary_crossentropy',
-        metrics=['accuracy', 'precision', 'recall'],
-        epochs = 50,
-        batch_size = 16, 
-        filename="bc_unet3d.keras",
-        model_name="bc_unet3d"
-    )
+Optional arguments:
+- --augmentation, -a: Type of data augmentation
+  - NONE: No augmentation (default)
+  - STANDARD: Basic augmentation
+  - OURS: Advanced microscopy-specific augmentation
+- --psf PATH: Path to Point Spread Function file for microscopy augmentation
 ```
 
+Example commands:
+```bash
+# Basic training without augmentation
+python src/modeling/train.py UNet3D /path/to/training_patches
 
+# Training with advanced augmentation and PSF
+python src/modeling/train.py UNet3D /path/to/training_patches -a OURS --psf /path/to/psf.tif
+```
 
+### 3. Generate Predictions (`predict.py`)
 
+Generate segmentation predictions using trained models:
 
+```bash
+python src/modeling/predict.py PATCHES_DIR COMPLETE_IMAGES_DIR MODELS_DIR [OUTPUT_DIR]
 
+Required arguments:
+- PATCHES_DIR: Directory containing padded patches for deep learning
+- COMPLETE_IMAGES_DIR: Directory containing full images for classical methods
+- MODELS_DIR: Directory containing trained models
+
+Optional arguments:
+- --output_dir: Directory to save predictions (default: reports/)
+```
+
+Example command:
+```bash
+python src/modeling/predict.py /path/to/padded_patches /path/to/complete_images /path/to/models --output_dir /path/to/predictions
+```
+
+### 4. Generate Plots (`plots.py`)
+
+Generate comparison plots and metrics between different methods:
+
+```bash
+python src/plots.py PATCHES_DIR COMPLETE_IMAGES_DIR MODELS_DIR [OUTPUT_DIR]
+
+Required arguments:
+- PATCHES_DIR: Directory containing patches with ground truth
+- COMPLETE_IMAGES_DIR: Directory containing complete images
+- MODELS_DIR: Directory containing trained models
+
+Optional arguments:
+- --output_dir: Directory to save plots (default: reports/figures/)
+```
+
+Example command:
+```bash
+python src/plots.py /path/to/patches /path/to/complete_images /path/to/models --output_dir /path/to/plots
+```
+
+## Configuration
+
+All default parameters can be modified in `config.py`. Here are the key parameters you might want to adjust:
+
+```python
+# Patch generation settings
+PATCH_SIZE = (64, 64, 64)  # Size of each 3D patch
+PATCH_STEP = 64           # Step size between patches
+
+# Training parameters
+LEARNING_RATE = 1e-4      # Learning rate for training
+BATCH_SIZE = 1           # Number of samples per training batch
+NUM_EPOCHS = 50          # Number of training epochs
+VALIDATION_SPLIT = 0.2   # Fraction of data used for validation
+
+# Early stopping settings
+EARLY_STOPPING_PATIENCE = 10  # Number of epochs to wait before stopping
+EARLY_STOPPING_MIN_DELTA = 0  # Minimum change to qualify as improvement
+
+# Model options
+AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
+
+# Intensity augmentation settings
+INTENSITY_PARAMS = {
+    "background_level": 0.1,        # Background intensity
+    "local_variation_scale": 5,     # Local intensity variations
+    "z_decay_rate": 0.999,         # Z-axis intensity decay
+    "noise_std": 0.1,              # Gaussian noise level
+    "poisson_scale": 1.0,          # Poisson noise scaling
+    "intensity_scale": 1000.0,      # Overall intensity scaling
+    "snr_targets": [15, 10, 5, 4, 3, 2, 1]  # Target signal-to-noise ratios
+}
+```
+
+## Common Issues and Solutions
+
+1. If you get "out of memory" errors:
+   - Reduce `BATCH_SIZE` in config.py
+   - Try smaller `PATCH_SIZE`
+
+2. If reconstruction looks incorrect:
+   - Make sure you used padded patches (generated with `USE_PADDING=true`)
+   - Verify patch size matches training patch size
+
+3. For GPU-related errors:
+   - Make sure your GPU has enough memory
+   - Try reducing model size or batch size
+
+## Directory Structure
+
+Your dataset should follow this structure:
+```
+dataset/
+├── images/
+│   └── *.tif
+└── masks/
+    └── *.tif
+```
