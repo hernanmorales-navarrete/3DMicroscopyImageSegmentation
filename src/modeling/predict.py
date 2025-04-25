@@ -5,6 +5,8 @@ from loguru import logger
 import typer
 import tifffile
 from collections import defaultdict
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
 from src.plots import load_deep_models
@@ -84,6 +86,29 @@ def reconstruct_image(patches_dict, original_shape):
     return reconstructed[: original_shape[0], : original_shape[1], : original_shape[2]]
 
 
+def process_single_patch(args):
+    """Process a single patch for classical methods in parallel execution.
+
+    Args:
+        args: Tuple of (img_path, method)
+
+    Returns:
+        Tuple of (image_name, orig_shape, position, prediction)
+    """
+    img_path, method = args
+
+    # Extract patch information
+    image_name, orig_shape, position = extract_patch_info(img_path)
+
+    # Read patch
+    patch = tifffile.imread(str(img_path))
+
+    # Get prediction using predict_patch (classical method only)
+    pred = predict_patch(patch, model=None, method=method)
+
+    return image_name, orig_shape, position, pred
+
+
 def predict_patches(image_paths, method="otsu", model=None):
     """Predict segmentation for all patches using specified method.
 
@@ -98,22 +123,51 @@ def predict_patches(image_paths, method="otsu", model=None):
     # Dictionary to store patches for each original image
     image_predictions = {}
 
-    for img_path in image_paths:
-        # Extract patch information
-        image_name, orig_shape, position = extract_patch_info(img_path)
+    if model is not None:
+        # Sequential processing for deep learning models
+        logger.info("Using sequential processing for deep learning model")
+        for img_path in image_paths:
+            # Extract patch information
+            image_name, orig_shape, position = extract_patch_info(img_path)
 
-        # Initialize predictions dictionary for this image if needed
-        if image_name not in image_predictions:
-            image_predictions[image_name] = (orig_shape, {})
+            # Initialize predictions dictionary for this image if needed
+            if image_name not in image_predictions:
+                image_predictions[image_name] = (orig_shape, {})
 
-        # Read patch
-        patch = tifffile.imread(str(img_path))
+            # Read patch
+            patch = tifffile.imread(str(img_path))
 
-        # Get prediction using predict_patch
-        pred = predict_patch(patch, model=model, method=method)
+            # Get prediction using predict_patch
+            pred = predict_patch(patch, model=model, method=method)
 
-        # Store prediction
-        image_predictions[image_name][1][position] = pred
+            # Store prediction
+            image_predictions[image_name][1][position] = pred
+    else:
+        # Parallel processing for classical methods
+        n_workers = max(1, multiprocessing.cpu_count() - 1)
+        logger.info(f"Using {n_workers} workers for parallel processing with {method} method")
+
+        # Prepare arguments for parallel processing
+        process_args = [(img_path, method) for img_path in image_paths]
+
+        # Process patches in parallel
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            # Submit all patches for processing
+            futures = []
+            for args in process_args:
+                future = executor.submit(process_single_patch, args)
+                futures.append(future)
+
+            # Process results as they complete
+            for future in futures:
+                image_name, orig_shape, position, pred = future.result()
+
+                # Initialize predictions dictionary for this image if needed
+                if image_name not in image_predictions:
+                    image_predictions[image_name] = (orig_shape, {})
+
+                # Store prediction
+                image_predictions[image_name][1][position] = pred
 
     return image_predictions
 
