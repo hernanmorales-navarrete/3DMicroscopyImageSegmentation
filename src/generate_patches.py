@@ -150,7 +150,8 @@ def generate_patches(
                     # Create filename with patch number, original size, and number of patches info
                     patch_filename = (
                         f"{img_path.stem}_"
-                        f"{orig_shape[0]}_{orig_shape[1]}_{orig_shape[2]}_"
+                        f"orig_{orig_shape[0]}_{orig_shape[1]}_{orig_shape[2]}_"
+                        f"{'' if not pad_images else f'pad_{img.shape[0]}_{img.shape[1]}_{img.shape[2]}_'}"
                         f"npatches_{n_patches_z}_{n_patches_y}_{n_patches_x}_"
                         f"patch_{patch_idx:04d}.tif"
                     )
