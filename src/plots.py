@@ -8,8 +8,6 @@ import typer
 import tensorflow as tf
 from loguru import logger
 import tifffile
-from concurrent.futures import ProcessPoolExecutor
-import multiprocessing
 
 from src.utils import configure_gpu
 from src.config import FIGURES_DIR, BATCH_SIZE
@@ -48,40 +46,37 @@ def load_deep_models(models_path):
     return models
 
 
-def evaluate_single_pair(image_path, mask_path, classical_methods_only=True):
-    """Evaluate a single image-mask pair with classical methods.
+def evaluate_complete_image(image_path, mask_path, method):
+    """Evaluate a single complete image with a classical method.
 
     Args:
         image_path: Path to image file
         mask_path: Path to mask file
-        classical_methods_only: If True, only evaluate classical methods
+        method: Classical method to use
 
     Returns:
-        List of dictionaries with results
+        Dictionary with metrics
     """
     # Read image and mask
-    patch = tifffile.imread(str(image_path))
+    image = tifffile.imread(str(image_path))
     mask = tifffile.imread(str(mask_path))
 
-    results = []
-    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
+    # Evaluate using classical method
+    metrics = evaluate_patch(image, mask, method=method)
+    metrics["method"] = f"Classical_{method}"
+    metrics["image_path"] = str(image_path)
 
-    # Evaluate classical methods
-    for method in classical_methods:
-        metrics = evaluate_patch(patch, mask, method=method)
-        metrics["method"] = f"Classical_{method}"
-        metrics["image_path"] = str(image_path)
-        results.append(metrics)
-
-    return results
+    return metrics
 
 
-def evaluate_methods(image_paths, mask_paths, deep_models):
-    """Evaluate all methods on the patches.
+def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_masks, deep_models):
+    """Evaluate all methods on the patches and complete images.
 
     Args:
-        image_paths: List of paths to image files
-        mask_paths: List of paths to mask files
+        patch_paths: List of paths to patch image files
+        patch_masks: List of paths to patch mask files
+        complete_image_paths: List of paths to complete image files
+        complete_masks: List of paths to complete mask files
         deep_models: Dictionary of deep learning models
 
     Returns:
@@ -89,37 +84,16 @@ def evaluate_methods(image_paths, mask_paths, deep_models):
     """
     all_results = []
 
-    # Number of workers (leave one core free for system processes)
-    n_workers = max(1, multiprocessing.cpu_count() - 1)
-    logger.info(f"Using {n_workers} workers for parallel processing")
-
-    # Process classical methods in parallel
-    with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        # Submit all pairs for processing classical methods
-        futures = [
-            executor.submit(evaluate_single_pair, img_path, mask_path)
-            for img_path, mask_path in zip(image_paths, mask_paths)
-        ]
-
-        # Collect results with progress bar
-        for future in tqdm(futures, total=len(image_paths), desc="Processing classical methods"):
-            try:
-                results = future.result()
-                all_results.extend(results)
-            except Exception as e:
-                logger.error(f"Error processing classical methods: {e}")
-                continue
-
     # Process deep learning models in batches
     if deep_models:
         logger.info("Processing deep learning models...")
-        n_samples = len(image_paths)
+        n_samples = len(patch_paths)
 
         for model_name, model in deep_models.items():
             for i in tqdm(range(0, n_samples, BATCH_SIZE), desc=f"Processing {model_name}"):
                 batch_slice = slice(i, min(i + BATCH_SIZE, n_samples))
-                batch_images = [tifffile.imread(str(p)) for p in image_paths[batch_slice]]
-                batch_masks = [tifffile.imread(str(p)) for p in mask_paths[batch_slice]]
+                batch_images = [tifffile.imread(str(p)) for p in patch_paths[batch_slice]]
+                batch_masks = [tifffile.imread(str(p)) for p in patch_masks[batch_slice]]
 
                 try:
                     # Stack images into a batch
@@ -130,7 +104,7 @@ def evaluate_methods(image_paths, mask_paths, deep_models):
 
                     # Evaluate each prediction in the batch
                     for j, (pred, mask, img_path) in enumerate(
-                        zip(batch_preds, batch_masks, image_paths[batch_slice])
+                        zip(batch_preds, batch_masks, patch_paths[batch_slice])
                     ):
                         # Ensure both pred and mask are binary (0 or 1)
                         pred_binary = (pred[..., 0] > 0).astype(np.uint8)
@@ -142,6 +116,25 @@ def evaluate_methods(image_paths, mask_paths, deep_models):
                 except Exception as e:
                     logger.error(f"Error processing batch for {model_name}: {e}")
                     continue
+
+    # Process classical methods on complete images
+    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
+
+    logger.info("Processing classical methods on complete images...")
+    for img_path, mask_path in tqdm(
+        zip(complete_image_paths, complete_masks),
+        total=len(complete_image_paths),
+        desc="Processing images",
+    ):
+        logger.info(f"Processing image: {img_path.name}")
+        for method in classical_methods:
+            logger.info(f"Applying {method} method")
+            try:
+                result = evaluate_complete_image(img_path, mask_path, method)
+                all_results.append(result)
+            except Exception as e:
+                logger.error(f"Error processing {img_path.name} with {method}: {e}")
+                continue
 
     return pd.DataFrame(all_results)
 
@@ -275,7 +268,12 @@ def plot_radar_chart(df, output_path):
 
 @app.command()
 def main(
-    test_dir: Path = typer.Argument(..., help="Directory containing test patches"),
+    patches_dir: Path = typer.Argument(
+        ..., help="Directory containing patches for deep learning methods"
+    ),
+    complete_images_dir: Path = typer.Argument(
+        ..., help="Directory containing complete images for classical methods"
+    ),
     models_dir: Path = typer.Argument(..., help="Directory containing trained models"),
     output_dir: Path = typer.Option(FIGURES_DIR, help="Directory to save plots"),
 ):
@@ -284,18 +282,33 @@ def main(
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get image and mask paths
-    logger.info("Getting file paths...")
-    image_paths = sorted(test_dir.glob("images/**/*.tif"))
-    mask_paths = sorted(test_dir.glob("masks/**/*.tif"))
+    # Get patch paths for deep learning
+    logger.info("Getting patch file paths...")
+    patch_paths = sorted(patches_dir.glob("images/**/*.tif"))
+    patch_masks = sorted(patches_dir.glob("masks/**/*.tif"))
 
-    if not image_paths or not mask_paths:
-        raise ValueError(f"No .tif files found in {test_dir}/images/ or {test_dir}/masks/")
+    if not patch_paths or not patch_masks:
+        raise ValueError(f"No .tif files found in {patches_dir}/images/ or {patches_dir}/masks/")
 
-    if len(image_paths) != len(mask_paths):
-        raise ValueError("Number of images does not match number of masks")
+    if len(patch_paths) != len(patch_masks):
+        raise ValueError("Number of patch images does not match number of patch masks")
 
-    logger.info(f"Found {len(image_paths)} image-mask pairs")
+    logger.info(f"Found {len(patch_paths)} patch image-mask pairs")
+
+    # Get complete image paths for classical methods
+    logger.info("Getting complete image file paths...")
+    complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
+    complete_masks = sorted(complete_images_dir.glob("masks/**/*.tif"))
+
+    if not complete_image_paths or not complete_masks:
+        raise ValueError(
+            f"No .tif files found in {complete_images_dir}/images/ or {complete_images_dir}/masks/"
+        )
+
+    if len(complete_image_paths) != len(complete_masks):
+        raise ValueError("Number of complete images does not match number of complete masks")
+
+    logger.info(f"Found {len(complete_image_paths)} complete image-mask pairs")
 
     # Load deep learning models
     logger.info("Loading deep learning models...")
@@ -303,7 +316,9 @@ def main(
 
     # Evaluate all methods
     logger.info("Evaluating methods...")
-    results_df = evaluate_methods(image_paths, mask_paths, deep_models)
+    results_df = evaluate_methods(
+        patch_paths, patch_masks, complete_image_paths, complete_masks, deep_models
+    )
 
     # List of metrics to plot
     metrics = [

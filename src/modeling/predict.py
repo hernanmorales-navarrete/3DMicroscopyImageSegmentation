@@ -4,8 +4,6 @@ import numpy as np
 from loguru import logger
 import typer
 import tifffile
-import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
 from patchify import unpatchify
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
@@ -45,36 +43,12 @@ def extract_patch_info(filename):
     return image_name, orig_shape, padded_shape, n_patches
 
 
-def process_single_patch(args):
-    """Process a single patch for classical methods in parallel execution.
-
-    Args:
-        args: Tuple of (img_path, patch_idx, method)
-
-    Returns:
-        Tuple of (image_name, orig_shape, padded_shape, n_patches, patch_idx, prediction)
-    """
-    img_path, patch_idx, method = args
-
-    # Extract patch information
-    image_name, orig_shape, padded_shape, n_patches = extract_patch_info(img_path)
-
-    # Read patch
-    patch = tifffile.imread(str(img_path))
-
-    # Get prediction using predict_patch (classical method only)
-    pred = predict_patch(patch, model=None, method=method)
-
-    return image_name, orig_shape, padded_shape, n_patches, patch_idx, pred
-
-
-def predict_patches(image_paths, method="otsu", model=None):
-    """Predict segmentation for all patches using specified method.
+def predict_patches(image_paths, model):
+    """Predict segmentation for all patches using deep learning model.
 
     Args:
         image_paths: List of patch image paths
-        method: Classical method name or None for deep learning
-        model: Deep learning model (if method is None)
+        model: Deep learning model
 
     Returns:
         Dictionary mapping image names to (original_shape, padded_shape, n_patches, predictions) tuple
@@ -82,55 +56,30 @@ def predict_patches(image_paths, method="otsu", model=None):
     # Dictionary to store patches for each original image
     image_predictions = {}
 
-    if model is not None:
-        # Sequential processing for deep learning models
-        logger.info("Using sequential processing for deep learning model")
-        for img_path in image_paths:
-            # Extract patch information and patch index
-            image_name, orig_shape, padded_shape, n_patches = extract_patch_info(img_path)
-            patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
+    # Sequential processing for deep learning models
+    logger.info("Processing patches with deep learning model")
+    for img_path in image_paths:
+        # Extract patch information and patch index
+        image_name, orig_shape, padded_shape, n_patches = extract_patch_info(img_path)
+        patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
 
-            # Initialize predictions dictionary for this image if needed
-            if image_name not in image_predictions:
-                image_predictions[image_name] = (orig_shape, padded_shape, n_patches, [])
+        # Initialize predictions dictionary for this image if needed
+        if image_name not in image_predictions:
+            image_predictions[image_name] = (orig_shape, padded_shape, n_patches, [])
 
-            # Read patch
-            patch = tifffile.imread(str(img_path))
+        # Read patch
+        patch = tifffile.imread(str(img_path))
 
-            # Get prediction using predict_patch
-            pred = predict_patch(patch, model=model, method=method)
+        # Add batch and channel dimensions if needed
+        if len(patch.shape) == 3:
+            patch = patch[np.newaxis, ..., np.newaxis]
 
-            # Store prediction
-            image_predictions[image_name][3].append((patch_idx, pred))
-    else:
-        # Parallel processing for classical methods
-        n_workers = max(1, multiprocessing.cpu_count() - 1)
-        logger.info(f"Using {n_workers} workers for parallel processing with {method} method")
+        # Get prediction
+        pred = model.predict(patch, verbose=0)
+        pred = (pred[0, ..., 0] > 0.5).astype(np.uint8)
 
-        # Prepare arguments for parallel processing
-        process_args = []
-        for img_path in image_paths:
-            patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
-            process_args.append((img_path, patch_idx, method))
-
-        # Process patches in parallel
-        with ProcessPoolExecutor(max_workers=n_workers) as executor:
-            # Submit all patches for processing
-            futures = []
-            for args in process_args:
-                future = executor.submit(process_single_patch, args)
-                futures.append(future)
-
-            # Process results as they complete
-            for future in futures:
-                image_name, orig_shape, padded_shape, n_patches, patch_idx, pred = future.result()
-
-                # Initialize predictions dictionary for this image if needed
-                if image_name not in image_predictions:
-                    image_predictions[image_name] = (orig_shape, padded_shape, n_patches, [])
-
-                # Store prediction
-                image_predictions[image_name][3].append((patch_idx, pred))
+        # Store prediction
+        image_predictions[image_name][3].append((patch_idx, pred))
 
     # Sort predictions by patch index for each image
     for image_name in image_predictions:
@@ -146,64 +95,53 @@ def predict_patches(image_paths, method="otsu", model=None):
     return image_predictions
 
 
+def predict_complete_image(image_path, method):
+    """Predict segmentation for a complete image using classical method.
+
+    Args:
+        image_path: Path to complete image
+        method: Classical segmentation method
+
+    Returns:
+        Binary prediction mask
+    """
+    # Read image
+    image = tifffile.imread(str(image_path))
+
+    # Apply classical method prediction
+    prediction = predict_patch(image, model=None, method=method)
+
+    return prediction
+
+
 @app.command()
 def main(
-    test_dir: Path = typer.Argument(..., help="Directory containing test patches"),
+    patches_dir: Path = typer.Argument(
+        ..., help="Directory containing image patches for deep learning methods"
+    ),
+    complete_images_dir: Path = typer.Argument(
+        ..., help="Directory containing complete images for classical methods"
+    ),
     models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
     output_dir: Path = typer.Option(REPORTS_DIR, help="Directory to save predictions"),
 ):
-    """Generate predictions and reconstruct full images from patches."""
+    """Generate predictions using deep learning on patches and classical methods on complete images."""
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get image paths
-    logger.info("Getting file paths...")
-    image_paths = sorted(test_dir.glob("images/**/*.tif"))
+    # Process deep learning methods with patches
+    patch_paths = sorted(patches_dir.glob("images/**/*.tif"))
+    if not patch_paths:
+        raise ValueError(f"No .tif files found in {patches_dir}/images/")
 
-    if not image_paths:
-        raise ValueError(f"No .tif files found in {test_dir}/images/")
+    logger.info(f"Found {len(patch_paths)} patches for deep learning")
 
-    logger.info(f"Found {len(image_paths)} patches")
-
-    # Load deep learning models
-    logger.info("Loading deep learning models...")
+    # Load and apply deep learning models
     deep_models = load_deep_models(models_dir)
-
-    # Classical methods to try
-    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
-
-    # Process classical methods
-    for method in classical_methods:
-        logger.info(f"Processing classical method: {method}")
-        predictions = predict_patches(image_paths, method=method)
-
-        # Reconstruct and save each image
-        for image_name, (
-            orig_shape,
-            padded_shape,
-            n_patches,
-            patches_array,
-        ) in predictions.items():
-            # Reshape patches array to match unpatchify requirements (n_patches_z, n_patches_y, n_patches_x, *patch_size)
-            patches_reshaped = patches_array.reshape(
-                n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
-            )
-
-            # Reconstruct full image using unpatchify with padded shape
-            reconstructed = unpatchify(patches_reshaped, padded_shape)
-
-            # Crop back to original size
-            reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
-
-            # Save reconstructed image
-            output_path = output_dir / f"{image_name}_{method}.tif"
-            tifffile.imwrite(str(output_path), reconstructed)
-
-    # Process deep learning models
     for model_name, model in deep_models.items():
         logger.info(f"Processing deep learning model: {model_name}")
-        predictions = predict_patches(image_paths, model=model)
+        predictions = predict_patches(patch_paths, model=model)
 
         # Reconstruct and save each image
         for image_name, (
@@ -212,7 +150,6 @@ def main(
             n_patches,
             patches_array,
         ) in predictions.items():
-            # Reshape patches array to match unpatchify requirements (n_patches_z, n_patches_y, n_patches_x, *patch_size)
             patches_reshaped = patches_array.reshape(
                 n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
             )
@@ -226,6 +163,29 @@ def main(
             # Save reconstructed image
             output_path = output_dir / f"{image_name}_{model_name}.tif"
             tifffile.imwrite(str(output_path), reconstructed)
+
+    # Process classical methods with complete images
+    complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
+    if not complete_image_paths:
+        raise ValueError(f"No .tif files found in {complete_images_dir}/images/")
+
+    logger.info(f"Found {len(complete_image_paths)} complete images for classical methods")
+
+    # Classical methods to try
+    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
+
+    # Process each complete image with classical methods
+    for image_path in complete_image_paths:
+        image_name = image_path.stem
+        logger.info(f"Processing image: {image_name}")
+
+        for method in classical_methods:
+            logger.info(f"Applying {method} method")
+            prediction = predict_complete_image(image_path, method)
+
+            # Save prediction
+            output_path = output_dir / f"{image_name}_{method}.tif"
+            tifffile.imwrite(str(output_path), prediction)
 
     logger.success("Prediction and reconstruction complete!")
 
