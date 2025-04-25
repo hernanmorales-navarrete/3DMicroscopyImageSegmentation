@@ -1,0 +1,82 @@
+import numpy as np
+import cv2
+from skimage.filters import frangi
+from pathlib import Path
+from typing import Dict, Any, List, Tuple, Optional
+import tensorflow as tf
+from .base import ImageProcessor
+
+
+class Predictor(ImageProcessor):
+    """Class for making predictions using both classical and deep learning methods."""
+
+    def __init__(self):
+        self.classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
+
+    def apply_classical_threshold(self, image: np.ndarray, method: str = "otsu") -> np.ndarray:
+        """Apply classical thresholding methods."""
+        # Normalize and scale to [0, 255]
+        image = (self.normalize_image(image) * 255).astype(np.uint8)
+
+        if method == "otsu":
+            _, mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        elif method == "adaptive_mean":
+            mask = cv2.adaptiveThreshold(
+                image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+        elif method == "adaptive_gaussian":
+            mask = cv2.adaptiveThreshold(
+                image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
+        elif method == "binary":
+            _, mask = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+        elif method == "frangi":
+            mask = frangi(image)
+            mask = (mask - mask.min()) / (mask.max() - mask.min())
+            mask = (mask > 0.5).astype(np.uint8) * 255
+        else:
+            raise ValueError(f"Unknown thresholding method: {method}")
+
+        return (mask > 0).astype(np.uint8)
+
+    def predict_patch(
+        self, patch: np.ndarray, model: Optional[tf.keras.Model] = None, method: str = "otsu"
+    ) -> np.ndarray:
+        """Generate prediction for a single patch."""
+        # Normalize input patch
+        patch_norm = self.normalize_image(patch)
+
+        if model is not None:
+            # Deep learning prediction
+            patch_input = patch_norm[np.newaxis, ..., np.newaxis]
+            pred = model.predict(patch_input, verbose=0)
+            pred = pred[0, ..., 0]
+            pred = (pred > 0.5).astype(np.uint8)
+        else:
+            # Classical thresholding
+            pred = np.zeros_like(patch, dtype=np.uint8)
+            for z in range(patch.shape[0]):
+                slice_norm = (patch_norm[z, :, :] * 255).astype(np.uint8)
+                pred[z, :, :] = self.apply_classical_threshold(slice_norm, method)
+
+        return pred
+
+    @staticmethod
+    def load_deep_models(models_dir: Path) -> Dict[str, tf.keras.Model]:
+        """Load all deep learning models from the models directory."""
+        models = {}
+        for model_dir in models_dir.glob("*"):
+            if not model_dir.is_dir():
+                continue
+
+            # Get latest timestamp directory
+            latest_model = sorted(model_dir.glob("*"))[-1]
+
+            # Get model file (*.h5)
+            model_file = sorted(latest_model.glob("*.h5"))[-1]
+
+            # Load model
+            model = tf.keras.models.load_model(str(model_file))
+            models[model_dir.name] = model
+
+        return models
