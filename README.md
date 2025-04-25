@@ -6,29 +6,38 @@ This software provides tools for training and evaluating 3D microscopy image seg
 
 This guide explains how to use each command-line tool in detail. Before running any command, make sure you're in the project's root directory.
 
+### Note About Boolean Options
+
+Throughout this CLI, boolean options follow standard conventions:
+- Use `--flag` to enable a feature (sets it to true)
+- Use `--no-flag` to disable a feature (sets it to false)
+- If neither is specified, the default value is used
+
 ### 1. Generate Patches (`generate_patches.py`)
 
 This tool splits your 3D microscopy images into smaller patches for processing.
 
 ```bash
-python src/generate_patches.py PATH_TO_DATASET USE_PADDING
+python src/generate_patches.py PATH_TO_DATASET [OPTIONS]
 
 Required arguments:
 - PATH_TO_DATASET: Full path to your dataset directory
-- USE_PADDING: Either 'true' or 'false' (lowercase)
+
+Optional arguments:
+- --padding/--no-padding: Whether to use padding (default: --no-padding)
 ```
 
 **Important Note About Padding:**
-- For training: Use `false` (no padding needed)
-- For prediction/reconstruction: Use `true` (padding required for proper reconstruction)
+- For training: Use `--no-padding` (no padding needed)
+- For prediction/reconstruction: Use `--padding` (padding required for proper reconstruction)
 
 Example commands:
 ```bash
 # For training data
-python src/generate_patches.py /home/user/microscopy_data false
+python src/generate_patches.py /home/user/microscopy_data --no-padding
 
 # For prediction data
-python src/generate_patches.py /home/user/microscopy_data true
+python src/generate_patches.py /home/user/microscopy_data --padding
 ```
 
 Your input dataset must have this structure:
