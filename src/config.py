@@ -27,10 +27,6 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 PATCH_SIZE = (64, 64, 64)
 PATCH_STEP = 64
 
-# Augmentation flags
-STANDARD_AUGMENTATION = True
-OURS_AUGMENTATION = False
-
 # Intensity augmentation parameters
 INTENSITY_PARAMS = {
     "background_level": 0.1,  # Background intensity level
