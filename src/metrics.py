@@ -100,28 +100,31 @@ def predict_patch(patch, model=None, method="otsu"):
     Returns:
         Binary prediction mask with values 0 and 1
     """
+    # Normalize input patch consistently for both methods
+    patch_norm = (patch - patch.min()) / (patch.max() - patch.min() + np.finfo(float).eps)
+
     if model is not None:
         # Deep learning prediction
-        pred = model.predict(patch[np.newaxis, ..., np.newaxis])
-        pred = (pred > 0.5).astype(np.uint8)
+        # Add batch and channel dimensions
+        patch_input = patch_norm[np.newaxis, ..., np.newaxis]
+
+        # Get prediction
+        pred = model.predict(patch_input, verbose=0)
         pred = pred[0, ..., 0]  # Remove batch and channel dimensions
+
+        # Apply consistent thresholding
+        pred = (pred > 0.5).astype(np.uint8)
     else:
         # Classical thresholding
         # For 3D volumes, process each z-slice separately
         pred = np.zeros_like(patch, dtype=np.uint8)
         for z in range(patch.shape[0]):
-            # Get 2D slice
-            slice_data = patch[z, :, :]
-            # Normalize slice
-            slice_norm = (
-                (slice_data - slice_data.min())
-                / (slice_data.max() - slice_data.min() + np.finfo(float).eps)
-                * 255
-            ).astype(np.uint8)
+            # Get 2D slice and scale to [0, 255] for OpenCV
+            slice_norm = (patch_norm[z, :, :] * 255).astype(np.uint8)
             # Apply threshold to 2D slice
             pred[z, :, :] = apply_classical_threshold(slice_norm, method)
 
-    return (pred > 0).astype(np.uint8)
+    return pred  # Already binary (0 or 1)
 
 
 def evaluate_patch(patch, mask, model=None, method="otsu"):
