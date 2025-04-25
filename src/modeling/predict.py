@@ -78,16 +78,7 @@ def reconstruct_image(patches_dict, original_shape):
     # Place each patch in its position
     for position, patch in patches_dict.items():
         z, y, x = position
-        z_end = min(z + PATCH_SIZE[0], padded_shape[0])
-        y_end = min(y + PATCH_SIZE[1], padded_shape[1])
-        x_end = min(x + PATCH_SIZE[2], padded_shape[2])
-
-        # Handle edge cases where patch might be smaller
-        patch_z = z_end - z
-        patch_y = y_end - y
-        patch_x = x_end - x
-
-        reconstructed[z:z_end, y:y_end, x:x_end] = patch[:patch_z, :patch_y, :patch_x]
+        reconstructed[z : z + PATCH_SIZE[0], y : y + PATCH_SIZE[1], x : x + PATCH_SIZE[2]] = patch
 
     # Cut back to original shape
     return reconstructed[: original_shape[0], : original_shape[1], : original_shape[2]]
