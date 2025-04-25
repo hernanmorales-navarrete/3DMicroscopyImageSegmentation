@@ -95,13 +95,18 @@ def main(
     complete_images_dir: Path = typer.Argument(
         ..., help="Directory containing complete images for classical methods"
     ),
+    dataset_name: str = typer.Argument(
+        ...,
+        help="Identifier/name to distinguish and organize different sets of images - all predictions will be saved in a subdirectory with this name",
+    ),
     models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
     output_dir: Path = typer.Option(REPORTS_DIR, help="Directory to save predictions"),
 ):
     """Generate predictions using classical methods on complete images and then deep learning on patches."""
 
-    # Create output directory
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Create output directory with dataset subdirectory
+    dataset_output_dir = output_dir / dataset_name
+    dataset_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize predictor
     predictor = Predictor()
@@ -125,8 +130,8 @@ def main(
             logger.info(f"Applying {method} method")
             prediction = predictor.predict_patch(image, method=method)
 
-            # Save prediction
-            output_path = output_dir / f"{image_name}_{method}.tif"
+            # Save prediction in dataset subdirectory
+            output_path = dataset_output_dir / f"{image_name}_{method}.tif"
             predictor.save_image(prediction, output_path)
 
     # Then process deep learning methods with patches
@@ -159,11 +164,13 @@ def main(
             # Crop back to original size
             reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
 
-            # Save reconstructed image
-            output_path = output_dir / f"{image_name}_{model_name}.tif"
+            # Save reconstructed image in dataset subdirectory
+            output_path = dataset_output_dir / f"{image_name}_{model_name}.tif"
             predictor.save_image(reconstructed, output_path)
 
-    logger.success("Prediction and reconstruction complete!")
+    logger.success(
+        f"Prediction and reconstruction complete! Results saved in {dataset_output_dir}"
+    )
 
 
 if __name__ == "__main__":
