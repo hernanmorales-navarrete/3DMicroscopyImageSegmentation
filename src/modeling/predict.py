@@ -3,12 +3,10 @@ import re
 import numpy as np
 from loguru import logger
 import typer
-import tifffile
 from patchify import unpatchify
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
-from src.plots import load_deep_models
-from src.metrics import predict_patch
+from src.processors import Predictor
 
 app = typer.Typer()
 
@@ -43,11 +41,12 @@ def extract_patch_info(filename):
     return image_name, orig_shape, padded_shape, n_patches
 
 
-def predict_patches(image_paths, model):
+def predict_patches(image_paths, predictor, model):
     """Predict segmentation for all patches using deep learning model.
 
     Args:
         image_paths: List of patch image paths
+        predictor: Predictor instance
         model: Deep learning model
 
     Returns:
@@ -67,16 +66,9 @@ def predict_patches(image_paths, model):
         if image_name not in image_predictions:
             image_predictions[image_name] = (orig_shape, padded_shape, n_patches, [])
 
-        # Read patch
-        patch = tifffile.imread(str(img_path))
-
-        # Add batch and channel dimensions if needed
-        if len(patch.shape) == 3:
-            patch = patch[np.newaxis, ..., np.newaxis]
-
-        # Get prediction
-        pred = model.predict(patch, verbose=0)
-        pred = (pred[0, ..., 0] > 0.5).astype(np.uint8)
+        # Read and predict patch
+        patch = predictor.load_image(img_path)
+        pred = predictor.predict_patch(patch, model=model)
 
         # Store prediction
         image_predictions[image_name][3].append((patch_idx, pred))
@@ -95,25 +87,6 @@ def predict_patches(image_paths, model):
     return image_predictions
 
 
-def predict_complete_image(image_path, method):
-    """Predict segmentation for a complete image using classical method.
-
-    Args:
-        image_path: Path to complete image
-        method: Classical segmentation method
-
-    Returns:
-        Binary prediction mask
-    """
-    # Read image
-    image = tifffile.imread(str(image_path))
-
-    # Apply classical method prediction
-    prediction = predict_patch(image, model=None, method=method)
-
-    return prediction
-
-
 @app.command()
 def main(
     patches_dir: Path = typer.Argument(
@@ -130,6 +103,9 @@ def main(
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Initialize predictor
+    predictor = Predictor()
+
     # Process classical methods with complete images first
     complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
     if not complete_image_paths:
@@ -137,21 +113,21 @@ def main(
 
     logger.info(f"Found {len(complete_image_paths)} complete images for classical methods")
 
-    # Classical methods to try
-    classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
-
     # Process each complete image with classical methods
     for image_path in complete_image_paths:
         image_name = image_path.stem
         logger.info(f"Processing image: {image_name}")
 
-        for method in classical_methods:
+        # Load image
+        image = predictor.load_image(image_path)
+
+        for method in predictor.classical_methods:
             logger.info(f"Applying {method} method")
-            prediction = predict_complete_image(image_path, method)
+            prediction = predictor.predict_patch(image, method=method)
 
             # Save prediction
             output_path = output_dir / f"{image_name}_{method}.tif"
-            tifffile.imwrite(str(output_path), prediction)
+            predictor.save_image(prediction, output_path)
 
     # Then process deep learning methods with patches
     patch_paths = sorted(patches_dir.glob("images/**/*.tif"))
@@ -161,10 +137,10 @@ def main(
     logger.info(f"Found {len(patch_paths)} patches for deep learning")
 
     # Load and apply deep learning models
-    deep_models = load_deep_models(models_dir)
+    deep_models = predictor.load_deep_models(models_dir)
     for model_name, model in deep_models.items():
         logger.info(f"Processing deep learning model: {model_name}")
-        predictions = predict_patches(patch_paths, model=model)
+        predictions = predict_patches(patch_paths, predictor, model)
 
         # Reconstruct and save each image
         for image_name, (
@@ -185,7 +161,7 @@ def main(
 
             # Save reconstructed image
             output_path = output_dir / f"{image_name}_{model_name}.tif"
-            tifffile.imwrite(str(output_path), reconstructed)
+            predictor.save_image(reconstructed, output_path)
 
     logger.success("Prediction and reconstruction complete!")
 
