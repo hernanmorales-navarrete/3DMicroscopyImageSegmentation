@@ -89,17 +89,16 @@ def apply_classical_threshold(image, method="otsu"):
     return (mask > 0).astype(np.uint8)
 
 
-def evaluate_patch(patch, mask, model=None, method="otsu"):
-    """Evaluate a single patch using either classical or deep learning method.
+def predict_patch(patch, model=None, method="otsu"):
+    """Generate prediction for a single patch using either classical or deep learning method.
 
     Args:
         patch: Input image patch (3D volume of shape [z, y, x])
-        mask: Ground truth mask (3D volume of shape [z, y, x])
         model: Deep learning model (if None, uses classical method)
         method: Classical thresholding method (ignored if model is provided)
 
     Returns:
-        Dictionary with metrics
+        Binary prediction mask with values 0 and 1
     """
     if model is not None:
         # Deep learning prediction
@@ -122,8 +121,25 @@ def evaluate_patch(patch, mask, model=None, method="otsu"):
             # Apply threshold to 2D slice
             pred[z, :, :] = apply_classical_threshold(slice_norm, method)
 
-    # Ensure both mask and prediction are binary (0 or 1)
+    return (pred > 0).astype(np.uint8)
+
+
+def evaluate_patch(patch, mask, model=None, method="otsu"):
+    """Evaluate a single patch by comparing prediction with ground truth.
+
+    Args:
+        patch: Input image patch (3D volume of shape [z, y, x])
+        mask: Ground truth mask (3D volume of shape [z, y, x])
+        model: Deep learning model (if None, uses classical method)
+        method: Classical thresholding method (ignored if model is provided)
+
+    Returns:
+        Dictionary with metrics
+    """
+    # Get prediction
+    pred = predict_patch(patch, model, method)
+
+    # Ensure mask is binary (0 or 1)
     mask = (mask > 0).astype(np.uint8)
-    pred = (pred > 0).astype(np.uint8)
 
     return compute_metrics(mask, pred)
