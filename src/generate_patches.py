@@ -82,6 +82,9 @@ def generate_patches(
             img_patches = patchify(img, patch_size, step=step_size)
             mask_patches = patchify(mask, patch_size, step=step_size)
 
+            # Store number of patches in each dimension
+            n_patches_z, n_patches_y, n_patches_x = img_patches.shape[:3]
+
             # Get original image shape
             orig_shape = img.shape
 
@@ -104,10 +107,11 @@ def generate_patches(
                 leave=False,
             ) as pbar:
                 for patch_idx in range(total_patches):
-                    # Create filename with patch number and original size info
+                    # Create filename with patch number, original size, and number of patches info
                     patch_filename = (
                         f"{img_path.stem}_"
                         f"{orig_shape[0]}_{orig_shape[1]}_{orig_shape[2]}_"
+                        f"npatches_{n_patches_z}_{n_patches_y}_{n_patches_x}_"
                         f"patch_{patch_idx:04d}.tif"
                     )
 
