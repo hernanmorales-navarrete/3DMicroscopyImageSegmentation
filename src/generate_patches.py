@@ -13,11 +13,41 @@ from src.config import PATCH_SIZE, PATCH_STEP
 app = typer.Typer(help="CLI tool for generating 3D patches from microscopy datasets")
 
 
+def calculate_padding(
+    image_shape: Tuple[int, int, int], patch_size: Tuple[int, int, int], step_size: int
+) -> Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]:
+    """
+    Calculate required padding for each dimension to ensure (width - patch_width) mod step_size = 0.
+
+    Args:
+        image_shape: Original image shape (z, y, x)
+        patch_size: Size of patches (z, y, x)
+        step_size: Step size for patch generation
+
+    Returns:
+        Tuple of padding values for each dimension ((z_before, z_after), (y_before, y_after), (x_before, x_after))
+    """
+    padding = []
+    for dim, patch_dim in zip(image_shape, patch_size):
+        # Calculate how much is missing for the dimension to be perfectly divisible
+        remainder = (dim - patch_dim) % step_size
+        if remainder == 0:
+            pad_total = 0
+        else:
+            pad_total = step_size - remainder
+        # Split padding evenly between before and after
+        pad_before = pad_total // 2
+        pad_after = pad_total - pad_before
+        padding.append((pad_before, pad_after))
+    return tuple(padding)
+
+
 def generate_patches(
     dataset_dir: Union[str, Path],
     patch_size: Tuple[int, int, int] = PATCH_SIZE,
     step_size: int = PATCH_STEP,
     output_subdir: str = "patches",
+    pad_images: bool = False,
 ) -> None:
     """
     Generate 3D patches from TIFF/TIF microscopy images and their corresponding masks.
@@ -28,6 +58,7 @@ def generate_patches(
         patch_size: Size of 3D patches (tuple of 3 ints for x,y,z dimensions)
         step_size: Step size for patch generation
         output_subdir: Name of subdirectory to save patches
+        pad_images: Whether to pad images to ensure proper unpatchify reconstruction
     """
     dataset_dir = Path(dataset_dir)
     images_dir = dataset_dir / "images"
@@ -78,15 +109,24 @@ def generate_patches(
                 )
                 continue
 
+            # Store original shape before any padding
+            orig_shape = img.shape
+
+            if pad_images:
+                # Calculate required padding
+                padding = calculate_padding(img.shape, patch_size, step_size)
+                logger.info(f"Applying padding to {img_path.name}: {padding}")
+
+                # Apply padding to both image and mask
+                img = np.pad(img, padding, mode="reflect")
+                mask = np.pad(mask, padding, mode="reflect")
+
             # Generate 3D patches
             img_patches = patchify(img, patch_size, step=step_size)
             mask_patches = patchify(mask, patch_size, step=step_size)
 
             # Store number of patches in each dimension
             n_patches_z, n_patches_y, n_patches_x = img_patches.shape[:3]
-
-            # Get original image shape
-            orig_shape = img.shape
 
             # Create output directories for this image-mask pair
             img_patches_subdir = patches_images_dir / img_path.stem
@@ -145,6 +185,12 @@ def main(
         dir_okay=True,
         file_okay=False,
     ),
+    pad_images: bool = typer.Option(
+        False,
+        "--pad",
+        "-p",
+        help="Pad images to ensure proper reconstruction with unpatchify",
+    ),
 ) -> None:
     """
     Generate 3D patches from microscopy images and their corresponding masks.
@@ -156,7 +202,7 @@ def main(
     All patch generation parameters are configured in config.py
     """
     # Generate patches using config values
-    generate_patches(dataset_dir=dataset_dir)
+    generate_patches(dataset_dir=dataset_dir, pad_images=pad_images)
 
 
 if __name__ == "__main__":
