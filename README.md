@@ -8,36 +8,31 @@ This guide explains how to use each command-line tool in detail. Before running 
 
 ### Note About Boolean Options
 
-Throughout this CLI, boolean options follow standard conventions:
-- Use `--flag` to enable a feature (sets it to true)
-- Use `--no-flag` to disable a feature (sets it to false)
-- If neither is specified, the default value is used
+Throughout this CLI, boolean options follow these conventions:
+- Use `--option/--no-option` to enable/disable a feature
+- Short versions use `-o/-O` format when available
+- Default values are always shown in help text
+- Some options may have custom names (e.g. `--accept/--reject`)
 
 ### 1. Generate Patches (`generate_patches.py`)
 
 This tool splits your 3D microscopy images into smaller patches for processing.
 
 ```bash
-python src/generate_patches.py PATH_TO_DATASET [OPTIONS]
+python src/generate_patches.py PATH_TO_DATASET PAD_IMAGES
 
 Required arguments:
 - PATH_TO_DATASET: Full path to your dataset directory
-
-Optional arguments:
-- --padding/--no-padding: Whether to use padding (default: --no-padding)
+- PAD_IMAGES: True/False - Whether to pad images for proper reconstruction
 ```
-
-**Important Note About Padding:**
-- For training: Use `--no-padding` (no padding needed)
-- For prediction/reconstruction: Use `--padding` (padding required for proper reconstruction)
 
 Example commands:
 ```bash
-# For training data
-python src/generate_patches.py /home/user/microscopy_data --no-padding
+# For training data (no padding)
+python src/generate_patches.py /home/user/microscopy_data False
 
-# For prediction data
-python src/generate_patches.py /home/user/microscopy_data --padding
+# For prediction data (with padding)
+python src/generate_patches.py /home/user/microscopy_data True
 ```
 
 Your input dataset must have this structure:
@@ -63,11 +58,12 @@ Required arguments:
 - DATA_DIR: Path to directory containing training patches
 
 Optional arguments:
-- --augmentation, -a: Type of data augmentation
-  - NONE: No augmentation (default)
+- --augmentation, -a: Type of data augmentation [default: NONE]
+  - NONE: No augmentation
   - STANDARD: Basic augmentation
   - OURS: Advanced microscopy-specific augmentation
-- --psf PATH: Path to Point Spread Function file for microscopy augmentation
+- --psf, -p PATH: Path to Point Spread Function file for microscopy augmentation
+- --enable-reproducibility/--no-enable-reproducibility: Enable/disable reproducibility by setting random seeds [default: enabled]
 ```
 
 Example commands:
@@ -75,8 +71,11 @@ Example commands:
 # Basic training without augmentation
 python src/modeling/train.py UNet3D /path/to/training_patches
 
-# Training with advanced augmentation and PSF
-python src/modeling/train.py UNet3D /path/to/training_patches -a OURS --psf /path/to/psf.tif
+# Training with advanced augmentation, PSF, and reproducibility disabled
+python src/modeling/train.py UNet3D /path/to/training_patches \
+    -a OURS \
+    --psf data/external/PSF.tif \
+    --no-enable-reproducibility
 ```
 
 ### 3. Generate Predictions (`predict.py`)
@@ -178,4 +177,34 @@ dataset/
 │   └── *.tif
 └── masks/
     └── *.tif
+```
+
+## Available Datasets and PSF Files
+
+The project includes several datasets for 3D microscopy image segmentation:
+
+### Datasets
+- `BC.zip`: Bile Canaliculi dataset
+- `Sinusoids.zip`: Sinusoids dataset
+- `Sinusoids_filled.zip`: Filled Sinusoids dataset
+- `mouse.zip`: Mouse tissue dataset
+
+### Point Spread Functions (PSF)
+Two PSF files are provided for different datasets:
+
+- `PSF.tif`: Use this PSF file for:
+  - BC dataset
+  - Sinusoids dataset
+  - Sinusoids_filled dataset
+- `PSF_mouse.tif`: Use this PSF file for:
+  - Mouse dataset
+
+When training models with microscopy-specific augmentation (using `--augmentation OURS`), make sure to use the correct PSF file for your dataset:
+
+```bash
+# For BC, Sinusoids, or Sinusoids_filled datasets
+python src/modeling/train.py UNet3D /path/to/training_patches -a OURS --psf data/external/PSF.tif
+
+# For Mouse dataset
+python src/modeling/train.py UNet3D /path/to/training_patches -a OURS --psf data/external/PSF_mouse.tif
 ```
