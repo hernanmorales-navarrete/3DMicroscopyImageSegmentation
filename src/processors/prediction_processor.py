@@ -60,10 +60,30 @@ class Predictor(ImageProcessor):
         return pred
 
     @staticmethod
-    def load_deep_models(models_dir: Path) -> Dict[str, tf.keras.Model]:
-        """Load all deep learning models from the models directory."""
+    def load_deep_models(models_dir: Path, dataset_name: str = None) -> Dict[str, tf.keras.Model]:
+        """Load deep learning models from the models directory.
+
+        Args:
+            models_dir: Base directory containing all models
+            dataset_name: Optional name of dataset to filter models. If provided,
+                         only loads models trained on this dataset.
+
+        Returns:
+            Dictionary mapping model names to loaded models
+        """
         models = {}
-        for model_dir in models_dir.glob("*"):
+
+        # Get all model directories for the specified dataset
+        if dataset_name:
+            model_dirs = list((models_dir / dataset_name).glob("*"))
+        else:
+            # If no dataset specified, get all models from all datasets
+            model_dirs = []
+            for dataset_path in models_dir.glob("*"):
+                if dataset_path.is_dir():
+                    model_dirs.extend(dataset_path.glob("*"))
+
+        for model_dir in model_dirs:
             if not model_dir.is_dir():
                 continue
 
@@ -73,8 +93,12 @@ class Predictor(ImageProcessor):
             # Get model file (*.h5)
             model_file = sorted(latest_model.glob("*.h5"))[-1]
 
+            # Extract model name from directory structure
+            # Path format: models_dir/dataset_name/model_name_augmentation/timestamp/model.h5
+            model_name = model_dir.name.split("_")[0]  # Get base model name without augmentation
+
             # Load model
             model = tf.keras.models.load_model(str(model_file))
-            models[model_dir.name] = model
+            models[model_name] = model
 
         return models
