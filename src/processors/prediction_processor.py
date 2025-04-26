@@ -11,7 +11,7 @@ class Predictor(ImageProcessor):
     """Class for making predictions using both classical and deep learning methods."""
 
     def __init__(self):
-        self.classical_methods = ["binary", "otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
+        self.classical_methods = ["otsu", "adaptive_mean", "adaptive_gaussian", "frangi"]
 
     def apply_classical_threshold(self, image: np.ndarray, method: str = "otsu") -> np.ndarray:
         """Apply classical thresholding methods."""
@@ -28,8 +28,6 @@ class Predictor(ImageProcessor):
             mask = cv2.adaptiveThreshold(
                 image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
             )
-        elif method == "binary":
-            _, mask = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
         elif method == "frangi":
             mask = frangi(image)
             mask = (mask - mask.min()) / (mask.max() - mask.min())

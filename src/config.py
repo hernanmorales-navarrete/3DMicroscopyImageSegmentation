@@ -35,7 +35,23 @@ INTENSITY_PARAMS = {
     "noise_std": 0.1,  # Standard deviation for Gaussian noise
     "poisson_scale": 1.0,  # Scaling factor for Poisson noise
     "intensity_scale": 1000.0,  # Scale factor for image intensity before augmentation
-    "snr_targets": [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],  # Target SNR values for augmentation
+    "snr_targets": [
+        15,
+        14,
+        13,
+        12,
+        11,
+        10,
+        9,
+        8,
+        7,
+        6,
+        5,
+        4,
+        3,
+        2,
+        1,
+    ],  # Target SNR values for augmentation
 }
 
 # If tqdm is installed, configure loguru with tqdm.write
