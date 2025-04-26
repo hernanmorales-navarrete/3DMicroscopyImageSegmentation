@@ -70,7 +70,7 @@ AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
 
 # Training hyperparameters
 LEARNING_RATE = 1e-5
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 NUM_EPOCHS = 50
 VALIDATION_SPLIT = 0.2
 
