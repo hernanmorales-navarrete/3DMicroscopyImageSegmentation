@@ -35,7 +35,7 @@ INTENSITY_PARAMS = {
     "noise_std": 0.1,  # Standard deviation for Gaussian noise
     "poisson_scale": 1.0,  # Scaling factor for Poisson noise
     "intensity_scale": 1000.0,  # Scale factor for image intensity before augmentation
-    "snr_targets": [15, 10, 5, 4, 3, 2, 1],  # Target SNR values for augmentation
+    "snr_targets": [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],  # Target SNR values for augmentation
 }
 
 # If tqdm is installed, configure loguru with tqdm.write
@@ -53,13 +53,13 @@ RANDOM_SEED = 42
 AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
 
 # Training hyperparameters
-LEARNING_RATE = 1e-4
-BATCH_SIZE = 1
+LEARNING_RATE = 1e-5
+BATCH_SIZE = 4
 NUM_EPOCHS = 50
 VALIDATION_SPLIT = 0.2
 
 # Early stopping parameters
-EARLY_STOPPING_PATIENCE = 10
+EARLY_STOPPING_PATIENCE = 5
 EARLY_STOPPING_MIN_DELTA = 0  # Use Keras default
 
 # Model checkpoint parameters
