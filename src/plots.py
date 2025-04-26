@@ -7,6 +7,10 @@ from loguru import logger
 
 from src.config import FIGURES_DIR, BATCH_SIZE
 from src.processors import Metrics, Predictor, Visualizer
+from src.utils import configure_gpu
+
+# Configure GPU at startup
+configure_gpu()
 
 app = typer.Typer()
 

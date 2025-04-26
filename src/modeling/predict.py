@@ -7,6 +7,10 @@ from patchify import unpatchify
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
 from src.processors import Predictor
+from src.utils import configure_gpu
+
+# Configure GPU at startup
+configure_gpu()
 
 app = typer.Typer()
 
