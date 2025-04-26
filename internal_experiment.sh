@@ -37,13 +37,16 @@ for dataset_dir in "${DATASETS[@]}"; do
 
     # Train models using training data
     echo "Training models for ${dataset_name}..."
-    for augmentation in "NONE" "STANDARD" "OURS"; do
-        echo "Training with ${augmentation} augmentation..."
-        if [ "${augmentation}" = "OURS" ]; then
-            python src/modeling/train.py "UNet" "${training_dir}/patches" --augmentation "${augmentation}" --psf "${psf_file}"
-        else
-            python src/modeling/train.py "UNet" "${training_dir}/patches" --augmentation "${augmentation}"
-        fi
+    for model in "UNet3D" "AttentionUNet3D"; do
+        echo "Training ${model} model..."
+        for augmentation in "NONE" "STANDARD" "OURS"; do
+            echo "Training with ${augmentation} augmentation..."
+            if [ "${augmentation}" = "OURS" ]; then
+                python src/modeling/train.py "${model}" "${training_dir}/patches" --augmentation "${augmentation}" --psf "${psf_file}"
+            else
+                python src/modeling/train.py "${model}" "${training_dir}/patches" --augmentation "${augmentation}"
+            fi
+        done
     done
 
     # Generate predictions on test data
