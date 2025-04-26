@@ -33,7 +33,9 @@ class Visualizer:
             fig.delaxes(axes[idx])
 
         plt.tight_layout()
-        plt.savefig(self.output_dir / "metrics_violin_plots.png", bbox_inches="tight", dpi=300)
+        plt.savefig(
+            self.output_dir / "metrics_violin_plots.svg", bbox_inches="tight", format="svg"
+        )
         plt.close()
 
     def plot_radar_chart(self, df: pd.DataFrame) -> None:
@@ -70,7 +72,7 @@ class Visualizer:
         plt.legend(loc="upper right", bbox_to_anchor=(0.1, 0.1))
         plt.title("Methods Comparison - Radar Chart")
         plt.tight_layout()
-        plt.savefig(self.output_dir / "methods_radar_chart.png", bbox_inches="tight", dpi=300)
+        plt.savefig(self.output_dir / "methods_radar_chart.svg", bbox_inches="tight", format="svg")
         plt.close()
 
     @staticmethod
