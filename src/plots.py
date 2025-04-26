@@ -34,37 +34,31 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
     predictor = Predictor()
     all_results = []
 
-    # Process deep learning models in batches
+    # Process deep learning models
     if deep_models:
         logger.info("Processing deep learning models...")
-        n_samples = len(patch_paths)
-
         for model_name, model in deep_models.items():
-            for i in tqdm(range(0, n_samples, BATCH_SIZE), desc=f"Processing {model_name}"):
-                batch_slice = slice(i, min(i + BATCH_SIZE, n_samples))
-                batch_images = [predictor.load_image(p) for p in patch_paths[batch_slice]]
-                batch_masks = [predictor.load_image(p) for p in patch_masks[batch_slice]]
-
+            for img_path, mask_path in tqdm(
+                zip(patch_paths, patch_masks),
+                total=len(patch_paths),
+                desc=f"Processing {model_name}",
+            ):
                 try:
-                    # Stack images into a batch
-                    batch_data = np.stack(batch_images)[..., np.newaxis]
-                    # Predict on batch
-                    batch_preds = model.predict(batch_data, verbose=0)
-                    batch_preds = (batch_preds > 0.5).astype(np.uint8)
+                    # Load and process single image
+                    image = predictor.load_image(img_path)
+                    mask = predictor.load_image(mask_path)
 
-                    # Evaluate each prediction in the batch
-                    for j, (pred, mask, img_path) in enumerate(
-                        zip(batch_preds, batch_masks, patch_paths[batch_slice])
-                    ):
-                        # Compute metrics
-                        pred_binary = pred[..., 0]
-                        mask_binary = metrics.ensure_binary_mask(mask)
-                        result = metrics.compute_metrics(mask_binary, pred_binary)
-                        result["method"] = f"Deep_{model_name}"
-                        result["image_path"] = str(img_path)
-                        all_results.append(result)
+                    # Predict on single image
+                    pred = predictor.predict_patch(image, model=model)
+
+                    # Compute metrics
+                    mask_binary = metrics.ensure_binary_mask(mask)
+                    result = metrics.compute_metrics(mask_binary, pred)
+                    result["method"] = f"Deep_{model_name}"
+                    result["image_path"] = str(img_path)
+                    all_results.append(result)
                 except Exception as e:
-                    logger.error(f"Error processing batch for {model_name}: {e}")
+                    logger.error(f"Error processing {img_path} for {model_name}: {e}")
                     continue
 
     # Process classical methods on complete images
@@ -72,7 +66,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
     for img_path, mask_path in tqdm(
         zip(complete_image_paths, complete_masks),
         total=len(complete_image_paths),
-        desc="Processing images",
+        desc="Processing classical methods",
     ):
         logger.info(f"Processing image: {img_path.name}")
 
@@ -91,7 +85,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
                 pred_patches = patchify(pred, PATCH_SIZE, PATCH_STEP)
                 mask_patches = patchify(mask_binary, PATCH_SIZE, PATCH_STEP)
 
-                # Reshape to match the deep learning evaluation format
+                # Reshape to match the evaluation format
                 pred_patches = pred_patches.reshape(-1, *PATCH_SIZE)
                 mask_patches = mask_patches.reshape(-1, *PATCH_SIZE)
 
