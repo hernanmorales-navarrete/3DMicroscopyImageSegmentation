@@ -14,7 +14,7 @@ class Visualizer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         sns.set_style("whitegrid")
 
-    def plot_violin(self, df: pd.DataFrame, metrics: List[str]) -> None:
+    def plot_violin(self, df: pd.DataFrame, metrics: List[str], dataset_name: str) -> None:
         """Create violin plots for metrics."""
         n_metrics = len(metrics)
         n_cols = 3
@@ -34,11 +34,13 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(
-            self.output_dir / "metrics_violin_plots.svg", bbox_inches="tight", format="svg"
+            self.output_dir / f"metrics_violin_plots_{dataset_name}.svg",
+            bbox_inches="tight",
+            format="svg",
         )
         plt.close()
 
-    def plot_radar_chart(self, df: pd.DataFrame) -> None:
+    def plot_radar_chart(self, df: pd.DataFrame, dataset_name: str) -> None:
         """Create radar chart comparing methods."""
         metrics = [
             "accuracy",
@@ -72,7 +74,11 @@ class Visualizer:
         plt.legend(loc="upper right", bbox_to_anchor=(0.1, 0.1))
         plt.title("Methods Comparison - Radar Chart")
         plt.tight_layout()
-        plt.savefig(self.output_dir / "methods_radar_chart.svg", bbox_inches="tight", format="svg")
+        plt.savefig(
+            self.output_dir / f"methods_radar_chart_{dataset_name}.svg",
+            bbox_inches="tight",
+            format="svg",
+        )
         plt.close()
 
     @staticmethod
