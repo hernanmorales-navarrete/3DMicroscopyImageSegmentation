@@ -6,7 +6,7 @@ import typer
 from loguru import logger
 from patchify import patchify
 
-from src.config import FIGURES_DIR, BATCH_SIZE, PATCH_SIZE, PATCH_STEP
+from src.config import FIGURES_DIR, BATCH_SIZE, PATCH_SIZE, PATCH_STEP, MODELS_DIR
 from src.processors import Metrics, Predictor, Visualizer
 from src.utils import configure_gpu
 
@@ -113,7 +113,15 @@ def main(
     complete_images_dir: Path = typer.Argument(
         ..., help="Directory containing complete images for classical methods"
     ),
-    models_dir: Path = typer.Argument(..., help="Directory containing trained models"),
+    dataset_name: str = typer.Argument(
+        ...,
+        help="Identifier/name to distinguish and organize different sets of images",
+    ),
+    models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
+    use_matching_models: bool = typer.Option(
+        True,
+        help="If True, only use models trained on the same dataset. If False, use all available models.",
+    ),
     output_dir: Path = typer.Option(FIGURES_DIR, help="Directory to save plots"),
 ):
     """Generate plots comparing classical and deep learning models."""
@@ -152,7 +160,13 @@ def main(
 
     # Load deep learning models
     logger.info("Loading deep learning models...")
-    deep_models = predictor.load_deep_models(models_dir)
+    dataset_filter = dataset_name if use_matching_models else None
+    deep_models = predictor.load_deep_models(models_dir, dataset_name=dataset_filter)
+
+    if not deep_models:
+        logger.warning(
+            f"No {'matching ' if use_matching_models else ''}deep learning models found in {models_dir}"
+        )
 
     # Evaluate all methods
     logger.info("Evaluating methods...")
@@ -175,16 +189,16 @@ def main(
 
     # Generate violin plots
     logger.info("Generating violin plots...")
-    visualizer.plot_violin(results_df, metrics)
+    visualizer.plot_violin(results_df, metrics, dataset_name)
 
     # Generate radar chart
     logger.info("Generating radar chart...")
-    visualizer.plot_radar_chart(results_df)
+    visualizer.plot_radar_chart(results_df, dataset_name)
 
     # Generate summary table
     logger.info("Generating summary table...")
     summary_df = visualizer.create_summary_table(results_df)
-    summary_df.to_csv(output_dir / "metrics_summary.csv")
+    summary_df.to_csv(output_dir / f"metrics_summary_{dataset_name}.csv")
 
     logger.success("Plot generation complete!")
 
