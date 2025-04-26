@@ -22,11 +22,11 @@ class Predictor(ImageProcessor):
             _, mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         elif method == "adaptive_mean":
             mask = cv2.adaptiveThreshold(
-                image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 31, 2
+                image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 71, 2
             )
         elif method == "adaptive_gaussian":
             mask = cv2.adaptiveThreshold(
-                image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
+                image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 71, 2
             )
         elif method == "frangi":
             mask = frangi(image)
