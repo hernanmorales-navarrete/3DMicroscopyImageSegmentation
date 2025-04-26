@@ -42,20 +42,20 @@ for dataset_dir in "${DATASETS[@]}"; do
         for augmentation in "NONE" "STANDARD" "OURS"; do
             echo "Training with ${augmentation} augmentation..."
             if [ "${augmentation}" = "OURS" ]; then
-                python src/modeling/train.py "${model}" "${training_dir}/patches" --augmentation "${augmentation}" --psf "${psf_file}"
+                python src/modeling/train.py "${model}" "${training_dir}/patches" "${dataset_name}" --augmentation "${augmentation}" --psf "${psf_file}"
             else
-                python src/modeling/train.py "${model}" "${training_dir}/patches" --augmentation "${augmentation}"
+                python src/modeling/train.py "${model}" "${training_dir}/patches" "${dataset_name}" --augmentation "${augmentation}"
             fi
         done
     done
 
     # Generate predictions on test data
     echo "Generating predictions for ${dataset_name} test data..."
-    python src/modeling/predict.py "${test_dir}/patches" "${test_dir}" "models" "${dataset_name}"
+    python src/modeling/predict.py "${test_dir}/patches" "${test_dir}" "${dataset_name}"
 
     # Generate evaluation plots using test data
     echo "Generating evaluation plots for ${dataset_name}..."
-    python src/plots.py "${test_dir}/patches" "${test_dir}" "models"
+    python src/plots.py "${test_dir}/patches" "${test_dir}" "${dataset_name}"
 
     echo "Completed processing dataset: ${dataset_name}"
     echo "----------------------------------------"
