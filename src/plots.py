@@ -4,8 +4,9 @@ import pandas as pd
 from tqdm import tqdm
 import typer
 from loguru import logger
+from patchify import patchify
 
-from src.config import FIGURES_DIR, BATCH_SIZE
+from src.config import FIGURES_DIR, BATCH_SIZE, PATCH_SIZE, PATCH_STEP
 from src.processors import Metrics, Predictor, Visualizer
 from src.utils import configure_gpu
 
@@ -83,12 +84,26 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
         for method in predictor.classical_methods:
             logger.info(f"Applying {method} method")
             try:
-                # Get prediction and compute metrics
+                # Get prediction for the whole image
                 pred = predictor.predict_patch(image, method=method)
-                result = metrics.compute_metrics(mask_binary, pred)
-                result["method"] = f"Classical_{method}"
-                result["image_path"] = str(img_path)
-                all_results.append(result)
+
+                # Break down prediction and mask into patches for evaluation
+                pred_patches = patchify(pred, PATCH_SIZE, PATCH_STEP)
+                mask_patches = patchify(mask_binary, PATCH_SIZE, PATCH_STEP)
+
+                # Reshape to match the deep learning evaluation format
+                pred_patches = pred_patches.reshape(-1, *PATCH_SIZE)
+                mask_patches = mask_patches.reshape(-1, *PATCH_SIZE)
+
+                # Evaluate each patch
+                for patch_idx in range(len(pred_patches)):
+                    result = metrics.compute_metrics(
+                        mask_patches[patch_idx], pred_patches[patch_idx]
+                    )
+                    result["method"] = f"Classical_{method}"
+                    result["image_path"] = f"{str(img_path)}_patch_{patch_idx}"
+                    all_results.append(result)
+
             except Exception as e:
                 logger.error(f"Error processing {img_path.name} with {method}: {e}")
                 continue
