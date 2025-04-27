@@ -145,6 +145,8 @@ class Predictor(ImageProcessor):
                 dir_parts[-1] if len(dir_parts) > 1 else "NONE"
             )  # Get augmentation type
 
-            models_info[model_name] = (str(model_file), augmentation_type)
+            # Use both model name and augmentation type as key
+            key = f"{model_name}_{augmentation_type}"
+            models_info[key] = (str(model_file), augmentation_type)
 
         return models_info

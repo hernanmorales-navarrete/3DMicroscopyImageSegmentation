@@ -34,7 +34,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
     metrics = Metrics()
     predictor = Predictor()
     all_results = []
-
+    logger.info(f"Deep models: {deep_models}")
     # Process deep learning models
     if deep_models:
         logger.info("Processing deep learning models...")
@@ -74,7 +74,9 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
                     try:
                         mask_binary = metrics.ensure_binary_mask(mask)
                         result = metrics.compute_metrics(mask_binary, pred)
-                        result["method"] = f"Deep_{model_name}"
+                        result["method"] = (
+                            model_name  # The model_name already includes augmentation type
+                        )
                         result["augmentation"] = augmentation_type
                         result["image_path"] = str(img_path)
                         all_results.append(result)
@@ -221,25 +223,15 @@ def main(
         "volume_similarity",
     ]
 
-    # Process each augmentation type separately
-    for augmentation_type in results_df["augmentation"].unique():
-        # Filter results for this augmentation type
-        aug_results_df = results_df[results_df["augmentation"] == augmentation_type]
+    # Generate plots combining all methods
+    logger.info("Generating combined plots for all methods...")
+    visualizer.plot_violin(results_df, metrics, f"{dataset_name}_combined")
+    visualizer.plot_radar_chart(results_df, f"{dataset_name}_combined")
 
-        # Generate violin plots
-        logger.info(f"Generating violin plots for {augmentation_type}...")
-        visualizer.plot_violin(aug_results_df, metrics, f"{dataset_name}_{augmentation_type}")
-
-        # Generate radar chart
-        logger.info(f"Generating radar chart for {augmentation_type}...")
-        visualizer.plot_radar_chart(aug_results_df, f"{dataset_name}_{augmentation_type}")
-
-        # Generate summary table
-        logger.info(f"Generating summary table for {augmentation_type}...")
-        summary_df = visualizer.create_summary_table(aug_results_df)
-        summary_df.to_csv(
-            dataset_output_dir / f"metrics_summary_{dataset_name}_{augmentation_type}.csv"
-        )
+    # Generate summary table
+    logger.info("Generating summary table...")
+    summary_df = visualizer.create_summary_table(results_df)
+    summary_df.to_csv(dataset_output_dir / f"metrics_summary_{dataset_name}_combined.csv")
 
     logger.success("Plot generation complete!")
 
