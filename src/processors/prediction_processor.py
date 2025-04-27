@@ -31,9 +31,10 @@ class Predictor(ImageProcessor):
         elif method == "binary":
             _, mask = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
         elif method == "frangi":
-            mask = frangi(image)
-            mask = (mask - mask.min()) / (mask.max() - mask.min())
-            mask = (mask > 0.5).astype(np.uint8) * 255
+            image = frangi(image)
+            image = (image - image.min()) / (image.max() - image.min())
+            image = image.astype(np.uint8) * 255
+            _, mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         else:
             raise ValueError(f"Unknown thresholding method: {method}")
 
