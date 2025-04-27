@@ -83,7 +83,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
             mask = transformed["mask3d"][..., np.newaxis]
 
         if self.augmentation == "OURS":
-            image = augment_patch_intensity(image, params=self.intensity_params)
+            image = augment_patch_intensity(image, mask, params=self.intensity_params)
 
         return image, mask
 
