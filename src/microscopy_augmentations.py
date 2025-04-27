@@ -66,7 +66,7 @@ def simulate_local_variations(shape, binnings=[1, 2, 4, 8], scale=5):
     return result
 
 
-def augment_patch_intensity(patch, params):
+def augment_patch_intensity(patch, mask, params):
     """Apply intensity-based augmentations to a 3D patch.
 
     This function applies various microscopy-specific augmentations:
@@ -85,21 +85,25 @@ def augment_patch_intensity(patch, params):
         Augmented patch with same shape as input
     """
     # Scale intensity before augmentation
-    patch = patch * params["intensity_scale"]
+    mask = mask.astype(np.uint16)
+    mask[mask>0] = 1  # make it is binary
+    patch = mask * params["intensity_scale"]
+    img = patch # temporay saving the patch
 
-    # Step 1: Add local variations and staining effects
+    # Step 1: Add z-axis intensity decay
+    if 0 < params["z_decay_rate"] < 1:
+        z_profile = np.exp(-np.arange(patch.shape[0]) * (1 - params["z_decay_rate"]))
+        patch = patch * z_profile[:, np.newaxis, np.newaxis, np.newaxis]
+    
+    # Step 2: Add local variations and staining effects
     local_var = simulate_local_variations(
         patch.shape[:-1],
         binnings=[1, 2, 4, 8],
         scale=params["local_variation_scale"],
     )
     patch = patch * local_var[..., np.newaxis]
-
-    # Step 2: Add z-axis intensity decay
-    if 0 < params["z_decay_rate"] < 1:
-        z_profile = np.exp(-np.arange(patch.shape[0]) * (1 - params["z_decay_rate"]))
-        patch = patch * z_profile[:, np.newaxis, np.newaxis, np.newaxis]
-
+    patch = np.clip(patch, 0, None)
+    
     # Step 3: Add background
     if params["background_level"] > 0:
         bg = np.ones_like(patch) * params["background_level"] * params["intensity_scale"]
@@ -109,7 +113,8 @@ def augment_patch_intensity(patch, params):
                 patch.shape[:-1], binnings=[1, 2], scale=params["local_variation_scale"]
             )[..., np.newaxis]
         )
-        bg_noise[patch > 0] = 0
+        bg_noise[patch != 0] = 0 # set 0 to places with FG
+        bg_noise = np.clip(bg_noise, 0, None)
         patch = patch + bg_noise
 
     # Step 4: Apply PSF convolution if specified
@@ -121,23 +126,27 @@ def augment_patch_intensity(patch, params):
     if params["poisson_scale"] > 0:
         scaled = patch * params["poisson_scale"]
         patch = np.random.poisson(scaled) / params["poisson_scale"]
+        patch = np.clip(patch, 0, None)
 
     # Step 6: Add Gaussian noise to achieve target SNR
     if params["snr_targets"] and len(params["snr_targets"]) > 0:
-        # Randomly select a target SNR
-        target_snr = np.random.choice(params["snr_targets"])
+        # Randomly select a target SNR, add 0 for chossing the originl image
+        target_snr = np.random.choice(params["snr_targets"].append(0))
 
-        # Calculate current SNR
-        signal = patch.copy()
-        signal[signal == 0] = np.nan  # Ignore background
-        signal_mean = np.nanmean(signal)
-
-        # Start with initial noise std
-        noise_std = signal_mean / (target_snr * params["intensity_scale"])
-
-        # Add Gaussian noise
-        noise = np.random.normal(0, noise_std, patch.shape)
-        patch = patch + noise
+        if target_snr == 0:
+            patch = img
+        else:
+            # Calculate current SNR
+            signal = patch.copy()
+            signal[signal == 0] = np.nan  # Ignore background
+            signal_mean = np.nanmean(signal)
+    
+            # Start with initial noise std
+            noise_std = signal_mean / (target_snr * params["intensity_scale"])
+    
+            # Add Gaussian noise
+            noise = np.random.normal(0, noise_std, patch.shape)
+            patch = patch + noise
 
     # Ensure non-negative values
     patch = np.clip(patch, 0, None)
