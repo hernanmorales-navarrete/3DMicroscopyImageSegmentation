@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 import tensorflow as tf
 from .base import ImageProcessor
+from ..config import BATCH_SIZE
 
 
 class Predictor(ImageProcessor):
@@ -31,7 +32,7 @@ class Predictor(ImageProcessor):
         elif method == "frangi":
             mask = frangi(image)
             mask = (mask - mask.min()) / (mask.max() - mask.min())
-            mask = (mask > 0.5).astype(np.uint8) * 255
+            mask = (mask > 0).astype(np.uint8) * 255
         else:
             raise ValueError(f"Unknown thresholding method: {method}")
 
@@ -59,21 +60,62 @@ class Predictor(ImageProcessor):
 
         return pred
 
+    def predict_batch_patches(
+        self,
+        patches: List[np.ndarray],
+        model: Optional[tf.keras.Model] = None,
+        method: str = "otsu",
+        batch_size: int = BATCH_SIZE,
+    ) -> List[np.ndarray]:
+        """Generate predictions for a batch of patches efficiently.
+
+        Args:
+            patches: List of patches to predict on
+            model: Optional deep learning model
+            method: Classical method to use if no model provided
+            batch_size: Batch size for deep learning predictions
+
+        Returns:
+            List of predictions corresponding to input patches
+        """
+        predictions = []
+
+        if model is not None:
+            # Process patches in batches for deep learning
+            for i in range(0, len(patches), batch_size):
+                batch = patches[i : i + batch_size]
+
+                # Normalize and prepare batch
+                batch_norm = np.stack([self.normalize_image(p) for p in batch])
+                batch_input = batch_norm[..., np.newaxis]
+
+                # Get predictions for batch
+                batch_preds = model.predict(batch_input, verbose=0)
+                batch_preds = (batch_preds[..., 0] > 0.5).astype(np.uint8)
+
+                # Add individual predictions to results
+                predictions.extend([pred for pred in batch_preds])
+        else:
+            # For classical methods, process each patch individually
+            for patch in patches:
+                pred = self.predict_patch(patch, method=method)
+                predictions.append(pred)
+
+        return predictions
+
     @staticmethod
-    def load_deep_models(
-        models_dir: Path, dataset_name: str = None
-    ) -> Dict[str, tuple[tf.keras.Model, str]]:
-        """Load deep learning models from the models directory.
+    def load_deep_models(models_dir: Path, dataset_name: str = None) -> Dict[str, tuple[str, str]]:
+        """Get paths to deep learning models from the models directory.
 
         Args:
             models_dir: Base directory containing all models
             dataset_name: Optional name of dataset to filter models. If provided,
-                         only loads models trained on this dataset.
+                         only includes models trained on this dataset.
 
         Returns:
-            Dictionary mapping model names to tuples of (loaded model, augmentation type)
+            Dictionary mapping model names to tuples of (model_path, augmentation_type)
         """
-        models = {}
+        models_info = {}
 
         # Get all model directories for the specified dataset
         if dataset_name:
@@ -103,8 +145,6 @@ class Predictor(ImageProcessor):
                 dir_parts[-1] if len(dir_parts) > 1 else "NONE"
             )  # Get augmentation type
 
-            # Load model
-            model = tf.keras.models.load_model(str(model_file))
-            models[model_name] = (model, augmentation_type)
+            models_info[model_name] = (str(model_file), augmentation_type)
 
-        return models
+        return models_info

@@ -5,6 +5,7 @@ from tqdm import tqdm
 import typer
 from loguru import logger
 from patchify import patchify
+import tensorflow as tf
 
 from src.config import FIGURES_DIR, BATCH_SIZE, PATCH_SIZE, PATCH_STEP, MODELS_DIR
 from src.processors import Metrics, Predictor, Visualizer
@@ -24,7 +25,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
         patch_masks: List of paths to patch mask files
         complete_image_paths: List of paths to complete image files
         complete_masks: List of paths to complete mask files
-        deep_models: Dictionary of deep learning models with their augmentation types
+        deep_models: Dictionary mapping model names to tuples of (model_path, augmentation_type)
 
     Returns:
         DataFrame with results
@@ -37,30 +38,57 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
     # Process deep learning models
     if deep_models:
         logger.info("Processing deep learning models...")
-        for model_name, (model, augmentation_type) in deep_models.items():
+        for model_name, (model_path, augmentation_type) in deep_models.items():
+            # Load all images and masks for batch processing
+            images = []
+            masks = []
             for img_path, mask_path in tqdm(
                 zip(patch_paths, patch_masks),
                 total=len(patch_paths),
-                desc=f"Processing {model_name} ({augmentation_type})",
+                desc=f"Loading data for {model_name} ({augmentation_type})",
             ):
                 try:
-                    # Load and process single image
-                    image = predictor.load_image(img_path)
-                    mask = predictor.load_image(mask_path)
-
-                    # Predict on single image
-                    pred = predictor.predict_patch(image, model=model)
-
-                    # Compute metrics
-                    mask_binary = metrics.ensure_binary_mask(mask)
-                    result = metrics.compute_metrics(mask_binary, pred)
-                    result["method"] = f"Deep_{model_name}"
-                    result["augmentation"] = augmentation_type
-                    result["image_path"] = str(img_path)
-                    all_results.append(result)
+                    images.append(predictor.load_image(img_path))
+                    masks.append(predictor.load_image(mask_path))
                 except Exception as e:
-                    logger.error(f"Error processing {img_path} for {model_name}: {e}")
+                    logger.error(f"Error loading {img_path}: {e}")
                     continue
+
+            try:
+                # Load model only when needed
+                logger.info(f"Loading model {model_name}")
+                model = tf.keras.models.load_model(model_path)
+
+                # Process all patches in batches
+                logger.info(f"Running batch predictions for {model_name}")
+                predictions = predictor.predict_batch_patches(
+                    images, model=model, batch_size=BATCH_SIZE
+                )
+
+                # Clear model from GPU memory
+                del model
+                tf.keras.backend.clear_session()
+
+                # Evaluate predictions
+                for img_path, mask, pred in zip(patch_paths, masks, predictions):
+                    try:
+                        mask_binary = metrics.ensure_binary_mask(mask)
+                        result = metrics.compute_metrics(mask_binary, pred)
+                        result["method"] = f"Deep_{model_name}"
+                        result["augmentation"] = augmentation_type
+                        result["image_path"] = str(img_path)
+                        all_results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error evaluating {img_path} for {model_name}: {e}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"Error processing model {model_name}: {e}")
+                # Ensure model is cleared even if an error occurs
+                if "model" in locals():
+                    del model
+                    tf.keras.backend.clear_session()
+                continue
 
     # Process classical methods on complete images
     logger.info("Processing classical methods on complete images...")
