@@ -4,6 +4,7 @@ import numpy as np
 from loguru import logger
 import typer
 from patchify import unpatchify
+import tensorflow as tf
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
 from src.processors import Predictor
@@ -45,17 +46,20 @@ def extract_patch_info(filename):
     return image_name, orig_shape, padded_shape, n_patches
 
 
-def predict_patches(image_paths, predictor, model):
+def predict_patches(image_paths, predictor, model_path):
     """Predict segmentation for all patches using deep learning model.
 
     Args:
         image_paths: List of patch image paths
         predictor: Predictor instance
-        model: Deep learning model
+        model_path: Path to the deep learning model
 
     Returns:
         Dictionary mapping image names to (original_shape, padded_shape, n_patches, predictions) tuple
     """
+    # Load the model
+    model = tf.keras.models.load_model(model_path)
+
     # Dictionary to store patches for each original image
     image_predictions = {}
 
@@ -158,9 +162,9 @@ def main(
             f"No {'matching ' if use_matching_models else ''}deep learning models found in {models_dir}"
         )
     else:
-        for model_name, (model, augmentation_type) in deep_models.items():
+        for model_name, (model_path, augmentation_type) in deep_models.items():
             logger.info(f"Processing deep learning model: {model_name} ({augmentation_type})")
-            predictions = predict_patches(patch_paths, predictor, model)
+            predictions = predict_patches(patch_paths, predictor, model_path)
 
             # Reconstruct and save each image
             for image_name, (
