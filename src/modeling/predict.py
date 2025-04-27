@@ -112,7 +112,7 @@ def main(
 ):
     """Generate predictions using classical methods on complete images and then deep learning on patches."""
 
-    # Create output directory with dataset subdirectory
+    # Create output directory
     dataset_output_dir = output_dir / dataset_name
     dataset_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -138,7 +138,7 @@ def main(
             logger.info(f"Applying {method} method")
             prediction = predictor.predict_patch(image, method=method)
 
-            # Save prediction in dataset subdirectory
+            # Save prediction without augmentation type for classical methods
             output_path = dataset_output_dir / f"{image_name}_{method}.tif"
             predictor.save_image(prediction, output_path)
 
@@ -158,8 +158,8 @@ def main(
             f"No {'matching ' if use_matching_models else ''}deep learning models found in {models_dir}"
         )
     else:
-        for model_name, model in deep_models.items():
-            logger.info(f"Processing deep learning model: {model_name}")
+        for model_name, (model, augmentation_type) in deep_models.items():
+            logger.info(f"Processing deep learning model: {model_name} ({augmentation_type})")
             predictions = predict_patches(patch_paths, predictor, model)
 
             # Reconstruct and save each image
@@ -179,8 +179,10 @@ def main(
                 # Crop back to original size
                 reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
 
-                # Save reconstructed image in dataset subdirectory
-                output_path = dataset_output_dir / f"{image_name}_{model_name}.tif"
+                # Save reconstructed image with augmentation type only for deep learning
+                output_path = (
+                    dataset_output_dir / f"{image_name}_{model_name}_{augmentation_type}.tif"
+                )
                 predictor.save_image(reconstructed, output_path)
 
     logger.success(

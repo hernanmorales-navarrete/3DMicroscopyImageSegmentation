@@ -24,7 +24,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
         patch_masks: List of paths to patch mask files
         complete_image_paths: List of paths to complete image files
         complete_masks: List of paths to complete mask files
-        deep_models: Dictionary of deep learning models
+        deep_models: Dictionary of deep learning models with their augmentation types
 
     Returns:
         DataFrame with results
@@ -37,11 +37,11 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
     # Process deep learning models
     if deep_models:
         logger.info("Processing deep learning models...")
-        for model_name, model in deep_models.items():
+        for model_name, (model, augmentation_type) in deep_models.items():
             for img_path, mask_path in tqdm(
                 zip(patch_paths, patch_masks),
                 total=len(patch_paths),
-                desc=f"Processing {model_name}",
+                desc=f"Processing {model_name} ({augmentation_type})",
             ):
                 try:
                     # Load and process single image
@@ -55,6 +55,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
                     mask_binary = metrics.ensure_binary_mask(mask)
                     result = metrics.compute_metrics(mask_binary, pred)
                     result["method"] = f"Deep_{model_name}"
+                    result["augmentation"] = augmentation_type
                     result["image_path"] = str(img_path)
                     all_results.append(result)
                 except Exception as e:
@@ -95,6 +96,7 @@ def evaluate_methods(patch_paths, patch_masks, complete_image_paths, complete_ma
                         mask_patches[patch_idx], pred_patches[patch_idx]
                     )
                     result["method"] = f"Classical_{method}"
+                    result["augmentation"] = "Classical"  # Mark as classical method
                     result["image_path"] = f"{str(img_path)}_patch_{patch_idx}"
                     all_results.append(result)
 
@@ -125,6 +127,10 @@ def main(
     output_dir: Path = typer.Option(FIGURES_DIR, help="Directory to save plots"),
 ):
     """Generate plots comparing classical and deep learning models."""
+
+    # Create output directory
+    dataset_output_dir = output_dir / dataset_name
+    dataset_output_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize classes
     predictor = Predictor()
@@ -187,18 +193,25 @@ def main(
         "volume_similarity",
     ]
 
-    # Generate violin plots
-    logger.info("Generating violin plots...")
-    visualizer.plot_violin(results_df, metrics, dataset_name)
+    # Process each augmentation type separately
+    for augmentation_type in results_df["augmentation"].unique():
+        # Filter results for this augmentation type
+        aug_results_df = results_df[results_df["augmentation"] == augmentation_type]
 
-    # Generate radar chart
-    logger.info("Generating radar chart...")
-    visualizer.plot_radar_chart(results_df, dataset_name)
+        # Generate violin plots
+        logger.info(f"Generating violin plots for {augmentation_type}...")
+        visualizer.plot_violin(aug_results_df, metrics, f"{dataset_name}_{augmentation_type}")
 
-    # Generate summary table
-    logger.info("Generating summary table...")
-    summary_df = visualizer.create_summary_table(results_df)
-    summary_df.to_csv(output_dir / f"metrics_summary_{dataset_name}.csv")
+        # Generate radar chart
+        logger.info(f"Generating radar chart for {augmentation_type}...")
+        visualizer.plot_radar_chart(aug_results_df, f"{dataset_name}_{augmentation_type}")
+
+        # Generate summary table
+        logger.info(f"Generating summary table for {augmentation_type}...")
+        summary_df = visualizer.create_summary_table(aug_results_df)
+        summary_df.to_csv(
+            dataset_output_dir / f"metrics_summary_{dataset_name}_{augmentation_type}.csv"
+        )
 
     logger.success("Plot generation complete!")
 

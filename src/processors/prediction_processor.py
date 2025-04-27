@@ -60,7 +60,9 @@ class Predictor(ImageProcessor):
         return pred
 
     @staticmethod
-    def load_deep_models(models_dir: Path, dataset_name: str = None) -> Dict[str, tf.keras.Model]:
+    def load_deep_models(
+        models_dir: Path, dataset_name: str = None
+    ) -> Dict[str, tuple[tf.keras.Model, str]]:
         """Load deep learning models from the models directory.
 
         Args:
@@ -69,7 +71,7 @@ class Predictor(ImageProcessor):
                          only loads models trained on this dataset.
 
         Returns:
-            Dictionary mapping model names to loaded models
+            Dictionary mapping model names to tuples of (loaded model, augmentation type)
         """
         models = {}
 
@@ -93,12 +95,16 @@ class Predictor(ImageProcessor):
             # Get model file (*.h5)
             model_file = sorted(latest_model.glob("*.h5"))[-1]
 
-            # Extract model name from directory structure
+            # Extract model name and augmentation type from directory structure
             # Path format: models_dir/dataset_name/model_name_augmentation/timestamp/model.h5
-            model_name = model_dir.name.split("_")[0]  # Get base model name without augmentation
+            dir_parts = model_dir.name.split("_")
+            model_name = dir_parts[0]  # Get base model name
+            augmentation_type = (
+                dir_parts[-1] if len(dir_parts) > 1 else "NONE"
+            )  # Get augmentation type
 
             # Load model
             model = tf.keras.models.load_model(str(model_file))
-            models[model_name] = model
+            models[model_name] = (model, augmentation_type)
 
         return models
