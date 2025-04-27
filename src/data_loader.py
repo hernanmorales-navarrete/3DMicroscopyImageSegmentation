@@ -70,7 +70,10 @@ class ImageDataset(tf.keras.utils.PyDataset):
         if self.augmentation == "NONE":
             return image, mask
 
-        if self.augmentation == "STANDARD":
+        if self.augmentation == "OURS":
+            image = augment_patch_intensity(image, mask, params=self.intensity_params)
+            
+        if self.augmentation == "STANDARD" or self.augmentation == "OURS":
             # Remove channel dimension for Albumentations
             image_no_channel = np.squeeze(image)
             mask_no_channel = np.squeeze(mask)
@@ -82,8 +85,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
             image = transformed["volume"][..., np.newaxis]
             mask = transformed["mask3d"][..., np.newaxis]
 
-        if self.augmentation == "OURS":
-            image = augment_patch_intensity(image, mask, params=self.intensity_params)
+
 
         return image, mask
 
