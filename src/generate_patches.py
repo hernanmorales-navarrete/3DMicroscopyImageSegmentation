@@ -71,7 +71,8 @@ def generate_patches(
         )
 
     # Create output directories
-    patches_dir = dataset_dir / output_subdir
+    prefix = "padded" if pad_images else "non_padded"
+    patches_dir = dataset_dir / f"{prefix}_{output_subdir}"
     patches_dir.mkdir(exist_ok=True, parents=True)
     patches_images_dir = patches_dir / "images"
     patches_masks_dir = patches_dir / "masks"
