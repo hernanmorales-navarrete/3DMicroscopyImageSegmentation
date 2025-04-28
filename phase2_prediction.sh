@@ -20,7 +20,7 @@ for dataset_dir in "${DATASETS[@]}"; do
     test_dir="${dataset_dir}/test_data"
     
     echo "Generating predictions for ${dataset_name} test data..."
-    python src/modeling/predict.py "${test_dir}/patches" "${test_dir}" "${dataset_name}"
+    python src/modeling/predict.py "${test_dir}/padded_patches" "${test_dir}" "${dataset_name}"
     
     echo "Completed predictions for dataset: ${dataset_name}"
     echo "----------------------------------------"
