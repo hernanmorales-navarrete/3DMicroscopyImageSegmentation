@@ -5,10 +5,7 @@ from src.config import (
     BATCH_SIZE,
     INTENSITY_PARAMS,
 )
-from src.microscopy_augmentations import (
-    augment_patch_intensity,
-    create_standard_augmentation_pipeline,
-)
+from src.processors.augmentation_processor import Augmentor
 
 
 class ImageDataset(tf.keras.utils.PyDataset):
@@ -46,10 +43,11 @@ class ImageDataset(tf.keras.utils.PyDataset):
         self.batch_size = batch_size
         self.augmentation = augmentation
         self.intensity_params = intensity_params or INTENSITY_PARAMS
+        self.augmentor = Augmentor(self.intensity_params)
 
         # Create standard augmentation pipeline if needed
         if self.augmentation == "STANDARD":
-            self.transform = create_standard_augmentation_pipeline()
+            self.transform = self.augmentor.create_standard_augmentation_pipeline()
 
         if not self.image_paths or not self.mask_paths:
             raise ValueError("No image or mask paths provided")
@@ -71,8 +69,10 @@ class ImageDataset(tf.keras.utils.PyDataset):
             return image, mask
 
         if self.augmentation == "OURS":
-            image = augment_patch_intensity(image, mask, params=self.intensity_params)
-            
+            image = self.augmentor.augment_patch_intensity(
+                image, mask, params=self.intensity_params
+            )
+
         if self.augmentation == "STANDARD" or self.augmentation == "OURS":
             # Remove channel dimension for Albumentations
             image_no_channel = np.squeeze(image)
@@ -84,8 +84,6 @@ class ImageDataset(tf.keras.utils.PyDataset):
             # Add channel dimension back
             image = transformed["volume"][..., np.newaxis]
             mask = transformed["mask3d"][..., np.newaxis]
-
-
 
         return image, mask
 
