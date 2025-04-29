@@ -98,7 +98,9 @@ class Augmentor(ImageProcessor):
         params = self.intensity_params
 
         if params["snr_targets"] and len(params["snr_targets"]) > 0:
-            target_snr = np.random.choice(params["snr_targets"].append(0))
+            possible_snrs = params["snr_targets"] + [0]
+            target_snr = np.random.choice(possible_snrs)
+
             if target_snr == 0:
                 return patch
             else:
@@ -137,7 +139,8 @@ class Augmentor(ImageProcessor):
                     bg_noise = np.clip(bg_noise, 0, None)
                     patch = patch + bg_noise
 
-                if params["use_psf"] and params["psf_path"]:
+                convolved_image = None
+                if params.get("use_psf") and params.get("psf_path"):
                     psf = tiff.imread(params["psf_path"])
                     convolved_image = self.convolve_with_psf(patch, psf)
                     patch = convolved_image
@@ -147,7 +150,7 @@ class Augmentor(ImageProcessor):
                     patch = np.random.poisson(scaled) / params["poisson_scale"]
                     patch = np.clip(patch, 0, None)
 
-                if convolved_image:
+                if convolved_image is not None:
                     patch = self.generate_SNR_image(
                         patch,
                         convolved_image,
