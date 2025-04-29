@@ -50,12 +50,24 @@ class Augmentor(ImageProcessor):
     def calculate_snr(
         self, signal: np.ndarray, noise: np.ndarray, mask: np.ndarray = None
     ) -> float:
-        """Calculate the Signal-to-Noise Ratio (SNR) for a given signal and noise."""
+        """Calculate the Signal-to-Noise Ratio (SNR) for a given signal and noise.
+
+        Returns:
+            SNR value or 0.0 if signal is empty or noise std is 0
+        """
         if mask is not None:
             signal = signal * mask
+
         non_zero_values = signal[signal != 0]
+        if len(non_zero_values) == 0:
+            return 0.0
+
         signal_mean = np.mean(non_zero_values)
         noise_std = np.std(noise)
+
+        if noise_std == 0 or np.isnan(noise_std):
+            return 0.0
+
         return signal_mean / noise_std
 
     def generate_SNR_image(
