@@ -25,7 +25,8 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 # VARIABLES
 
 PATCH_SIZE = (64, 64, 64)
-PATCH_STEP = 64
+PATCH_STEP = 64  # Step size for regular patch extraction
+PATCH_STEP_RECONSTRUCTION = 8  # Smaller step size for overlapping patches during reconstruction
 
 # Intensity augmentation parameters
 INTENSITY_PARAMS = {

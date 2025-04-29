@@ -8,7 +8,7 @@ from patchify import patchify
 from loguru import logger
 from tqdm.auto import tqdm
 
-from src.config import PATCH_SIZE, PATCH_STEP
+from src.config import PATCH_SIZE, PATCH_STEP, PATCH_STEP_RECONSTRUCTION
 
 app = typer.Typer(help="CLI tool for generating 3D patches from microscopy datasets")
 
@@ -17,12 +17,12 @@ def calculate_padding(
     image_shape: Tuple[int, int, int], patch_size: Tuple[int, int, int], step_size: int
 ) -> Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]:
     """
-    Calculate required padding for each dimension to ensure (width - patch_width) mod step_size = 0.
+    Calculate required padding for each dimension to ensure proper reconstruction with overlapping patches.
 
     Args:
         image_shape: Original image shape (z, y, x)
         patch_size: Size of patches (z, y, x)
-        step_size: Step size for patch generation
+        step_size: Step size for patch generation (smaller step size means more overlap)
 
     Returns:
         Tuple of padding values for each dimension ((z_before, z_after), (y_before, y_after), (x_before, x_after))
@@ -47,7 +47,7 @@ def generate_patches(
     patch_size: Tuple[int, int, int] = PATCH_SIZE,
     step_size: int = PATCH_STEP,
     output_subdir: str = "patches",
-    pad_images: bool = False,
+    for_reconstruction: bool = False,
 ) -> None:
     """
     Generate 3D patches from TIFF/TIF microscopy images and their corresponding masks.
@@ -56,13 +56,17 @@ def generate_patches(
     Args:
         dataset_dir: Root directory containing 'images' and 'masks' folders
         patch_size: Size of 3D patches (tuple of 3 ints for x,y,z dimensions)
-        step_size: Step size for patch generation
+        step_size: Step size for patch generation (if for_reconstruction is True, uses PATCH_STEP_RECONSTRUCTION)
         output_subdir: Name of subdirectory to save patches
-        pad_images: Whether to pad images to ensure proper unpatchify reconstruction
+        for_reconstruction: Whether patches should be generated with overlap for later reconstruction
     """
     dataset_dir = Path(dataset_dir)
     images_dir = dataset_dir / "images"
     masks_dir = dataset_dir / "masks"
+
+    # Use reconstruction step size if specified
+    if for_reconstruction:
+        step_size = PATCH_STEP_RECONSTRUCTION
 
     # Verify directory structure
     if not images_dir.exists() or not masks_dir.exists():
@@ -71,7 +75,7 @@ def generate_patches(
         )
 
     # Create output directories
-    prefix = "padded" if pad_images else "non_padded"
+    prefix = "reconstruction" if for_reconstruction else "regular"
     patches_dir = dataset_dir / f"{prefix}_{output_subdir}"
     patches_dir.mkdir(exist_ok=True, parents=True)
     patches_images_dir = patches_dir / "images"
@@ -89,6 +93,9 @@ def generate_patches(
 
     logger.info(f"Found {len(image_files)} images to process")
     logger.info(f"Using patch size: {patch_size}")
+    logger.info(
+        f"Using step size: {step_size} ({'with overlap for reconstruction' if for_reconstruction else 'without overlap'})"
+    )
 
     # Process each image and its corresponding mask
     for img_path in tqdm(image_files, desc="Processing images", position=0):
@@ -113,10 +120,10 @@ def generate_patches(
             # Store original shape before any padding
             orig_shape = img.shape
 
-            if pad_images:
-                # Calculate required padding
+            if for_reconstruction:
+                # Calculate required padding for reconstruction
                 padding = calculate_padding(img.shape, patch_size, step_size)
-                logger.info(f"Applying padding to {img_path.name}: {padding}")
+                logger.info(f"Applying padding for reconstruction to {img_path.name}: {padding}")
 
                 # Apply padding to both image and mask
                 img = np.pad(img, padding, mode="reflect")
@@ -152,7 +159,7 @@ def generate_patches(
                     patch_filename = (
                         f"{img_path.stem}_"
                         f"orig_{orig_shape[0]}_{orig_shape[1]}_{orig_shape[2]}_"
-                        f"{'' if not pad_images else f'pad_{img.shape[0]}_{img.shape[1]}_{img.shape[2]}_'}"
+                        f"{'' if not for_reconstruction else f'pad_{img.shape[0]}_{img.shape[1]}_{img.shape[2]}_'}"
                         f"npatches_{n_patches_z}_{n_patches_y}_{n_patches_x}_"
                         f"patch_{patch_idx:04d}.tif"
                     )
@@ -187,9 +194,9 @@ def main(
         dir_okay=True,
         file_okay=False,
     ),
-    pad_images: bool = typer.Argument(
+    for_reconstruction: bool = typer.Argument(
         ...,
-        help="Whether to pad images to ensure proper reconstruction with unpatchify",
+        help="Whether to generate overlapping patches suitable for image reconstruction",
     ),
 ) -> None:
     """
@@ -199,10 +206,20 @@ def main(
     - An 'images' subdirectory with 3D TIFF files
     - A 'masks' subdirectory with corresponding mask files
 
+    When for_reconstruction is True:
+    - Patches will be generated with overlap (smaller step size)
+    - Images will be padded if needed to ensure proper reconstruction
+    - Output will be saved in 'reconstruction_patches' directory
+
+    When for_reconstruction is False:
+    - Patches will be generated without overlap
+    - No padding will be applied
+    - Output will be saved in 'regular_patches' directory
+
     All patch generation parameters are configured in config.py
     """
     # Generate patches using config values
-    generate_patches(dataset_dir=dataset_dir, pad_images=pad_images)
+    generate_patches(dataset_dir=dataset_dir, for_reconstruction=for_reconstruction)
 
 
 if __name__ == "__main__":
