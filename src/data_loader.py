@@ -69,9 +69,7 @@ class ImageDataset(tf.keras.utils.PyDataset):
             return image, mask
 
         if self.augmentation == "OURS":
-            image = self.augmentor.augment_patch_intensity(
-                image, mask, params=self.intensity_params
-            )
+            image = self.augmentor.augment_patch_intensity(image, mask)
 
         if self.augmentation == "STANDARD" or self.augmentation == "OURS":
             # Remove channel dimension for Albumentations
