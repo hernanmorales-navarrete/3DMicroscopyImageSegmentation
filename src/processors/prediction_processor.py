@@ -115,39 +115,74 @@ class Predictor(ImageProcessor):
 
         Returns:
             Dictionary mapping model names to tuples of (model_path, augmentation_type)
+
+        Raises:
+            ValueError: If models directory structure is invalid or no models are found
         """
         models_info = {}
 
+        if not models_dir.exists():
+            raise ValueError(f"Models directory does not exist: {models_dir}")
+
         # Get all model directories for the specified dataset
         if dataset_name:
-            model_dirs = list((models_dir / dataset_name).glob("*"))
+            dataset_path = models_dir / dataset_name
+            if not dataset_path.exists():
+                raise ValueError(f"Dataset directory does not exist: {dataset_path}")
+            model_dirs = list(dataset_path.glob("*"))
+            if not model_dirs:
+                raise ValueError(f"No model directories found in dataset path: {dataset_path}")
         else:
             # If no dataset specified, get all models from all datasets
+            dataset_paths = list(models_dir.glob("*"))
+            if not dataset_paths:
+                raise ValueError(f"No dataset directories found in models path: {models_dir}")
+
             model_dirs = []
-            for dataset_path in models_dir.glob("*"):
+            for dataset_path in dataset_paths:
                 if dataset_path.is_dir():
-                    model_dirs.extend(dataset_path.glob("*"))
+                    dirs = list(dataset_path.glob("*"))
+                    if not dirs:
+                        raise ValueError(
+                            f"No model directories found in dataset path: {dataset_path}"
+                        )
+                    model_dirs.extend(dirs)
 
         for model_dir in model_dirs:
             if not model_dir.is_dir():
                 continue
 
-            # Get latest timestamp directory
-            latest_model = sorted(model_dir.glob("*"))[-1]
+            # Get timestamp directories
+            timestamp_dirs = list(model_dir.glob("*"))
+            if not timestamp_dirs:
+                raise ValueError(f"No timestamp directories found in model path: {model_dir}")
 
-            # Get model file (*.h5)
-            model_file = sorted(latest_model.glob("*.h5"))[-1]
+            # Get latest timestamp directory
+            latest_model = sorted(timestamp_dirs)[-1]
+
+            # Get model files (*.h5)
+            model_files = list(latest_model.glob("*.h5"))
+            if not model_files:
+                raise ValueError(f"No .h5 model files found in timestamp path: {latest_model}")
+
+            model_file = sorted(model_files)[-1]
 
             # Extract model name and augmentation type from directory structure
             # Path format: models_dir/dataset_name/model_name_augmentation/timestamp/model.h5
             dir_parts = model_dir.name.split("_")
+            if len(dir_parts) < 2:
+                raise ValueError(
+                    f"Invalid model directory name format. Expected 'model_name_augmentation', got: {model_dir.name}"
+                )
+
             model_name = dir_parts[0]  # Get base model name
-            augmentation_type = (
-                dir_parts[-1] if len(dir_parts) > 1 else "NONE"
-            )  # Get augmentation type
+            augmentation_type = dir_parts[-1]
 
             # Use both model name and augmentation type as key
             key = f"{model_name}_{augmentation_type}"
             models_info[key] = (str(model_file), augmentation_type)
+
+        if not models_info:
+            raise ValueError(f"No valid models found in directory structure: {models_dir}")
 
         return models_info
