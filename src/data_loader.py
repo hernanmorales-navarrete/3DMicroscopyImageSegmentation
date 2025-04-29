@@ -45,9 +45,8 @@ class ImageDataset(tf.keras.utils.PyDataset):
         self.intensity_params = intensity_params or INTENSITY_PARAMS
         self.augmentor = Augmentor(self.intensity_params)
 
-        # Create standard augmentation pipeline if needed
-        if self.augmentation == "STANDARD":
-            self.transform = self.augmentor.create_standard_augmentation_pipeline()
+        # Create standard augmentation pipeline for all cases
+        self.transform = self.augmentor.create_standard_augmentation_pipeline()
 
         if not self.image_paths or not self.mask_paths:
             raise ValueError("No image or mask paths provided")
