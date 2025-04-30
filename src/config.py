@@ -46,7 +46,6 @@ INTENSITY_PARAMS = {
         4,
         3,
         2,
-        1,
     ],  # Target SNR values for augmentation
 }
 
