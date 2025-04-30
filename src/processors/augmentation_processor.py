@@ -110,7 +110,7 @@ class Augmentor(ImageProcessor):
         params = self.intensity_params
 
         if params["snr_targets"] and len(params["snr_targets"]) > 0:
-            possible_snrs = params["snr_targets"] + [0] * (2 * len(params["snr_targets"]))
+            possible_snrs = params["snr_targets"] + [0] * (3 * len(params["snr_targets"]))
             target_snr = np.random.choice(possible_snrs)
 
             if target_snr == 0:
