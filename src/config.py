@@ -41,15 +41,7 @@ INTENSITY_PARAMS = {
     "std_dev": 10,  # Standard deviation for Gaussian noise
     "snr_targets": [
         15,
-        14,
-        13,
-        12,
-        11,
         10,
-        9,
-        8,
-        7,
-        6,
         5,
         4,
         3,
@@ -75,7 +67,7 @@ AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
 # Training hyperparameters
 LEARNING_RATE = 1e-5
 BATCH_SIZE = 8
-NUM_EPOCHS = 50
+NUM_EPOCHS = 100
 VALIDATION_SPLIT = 0.2
 
 # Early stopping parameters
