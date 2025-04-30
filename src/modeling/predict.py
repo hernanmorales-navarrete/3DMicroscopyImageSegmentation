@@ -105,13 +105,9 @@ def main(
     ),
     dataset_name: str = typer.Argument(
         ...,
-        help="Identifier/name to distinguish and organize different sets of images - all predictions will be saved in a subdirectory with this name",
+        help="Identifier/name to distinguish and organize different sets of images - all predictions will be saved in a subdirectory with this name. Only models trained on this dataset will be used.",
     ),
     models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
-    use_matching_models: bool = typer.Option(
-        True,
-        help="If True, only use models trained on the same dataset. If False, use all available models.",
-    ),
     output_dir: Path = typer.Option(REPORTS_DIR, help="Directory to save predictions"),
 ):
     """Generate predictions using classical methods on complete images and then deep learning on patches."""
@@ -154,40 +150,32 @@ def main(
     logger.info(f"Found {len(patch_paths)} patches for deep learning")
 
     # Load and apply deep learning models
-    dataset_filter = dataset_name if use_matching_models else None
-    deep_models = predictor.load_deep_models(models_dir, dataset_name=dataset_filter)
+    deep_models = predictor.load_deep_models(models_dir, dataset_name=dataset_name)
 
-    if not deep_models:
-        logger.warning(
-            f"No {'matching ' if use_matching_models else ''}deep learning models found in {models_dir}"
-        )
-    else:
-        for model_name, (model_path, augmentation_type) in deep_models.items():
-            logger.info(f"Processing deep learning model: {model_name} ({augmentation_type})")
-            predictions = predict_patches(patch_paths, predictor, model_path)
+    for model_name, (model_path, augmentation_type) in deep_models.items():
+        logger.info(f"Processing deep learning model: {model_name} ({augmentation_type})")
+        predictions = predict_patches(patch_paths, predictor, model_path)
 
-            # Reconstruct and save each image
-            for image_name, (
-                orig_shape,
-                padded_shape,
-                n_patches,
-                patches_array,
-            ) in predictions.items():
-                patches_reshaped = patches_array.reshape(
-                    n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
-                )
+        # Reconstruct and save each image
+        for image_name, (
+            orig_shape,
+            padded_shape,
+            n_patches,
+            patches_array,
+        ) in predictions.items():
+            patches_reshaped = patches_array.reshape(
+                n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
+            )
 
-                # Reconstruct full image using unpatchify with padded shape
-                reconstructed = unpatchify(patches_reshaped, padded_shape)
+            # Reconstruct full image using unpatchify with padded shape
+            reconstructed = unpatchify(patches_reshaped, padded_shape)
 
-                # Crop back to original size
-                reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
+            # Crop back to original size
+            reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
 
-                # Save reconstructed image with augmentation type only for deep learning
-                output_path = (
-                    dataset_output_dir / f"{image_name}_{model_name}_{augmentation_type}.tif"
-                )
-                predictor.save_image(reconstructed, output_path)
+            # Save reconstructed image with augmentation type only for deep learning
+            output_path = dataset_output_dir / f"{image_name}_{model_name}_{augmentation_type}.tif"
+            predictor.save_image(reconstructed, output_path)
 
     logger.success(
         f"Prediction and reconstruction complete! Results saved in {dataset_output_dir}"

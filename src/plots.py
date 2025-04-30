@@ -19,13 +19,9 @@ def main(
     ),
     dataset_name: str = typer.Argument(
         ...,
-        help="Identifier/name to distinguish and organize different sets of images",
+        help="Identifier/name to distinguish and organize different sets of images. Only models trained on this dataset will be used.",
     ),
     models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
-    use_matching_models: bool = typer.Option(
-        True,
-        help="If True, only use models trained on the same dataset. If False, use all available models.",
-    ),
     output_dir: Path = typer.Option(FIGURES_DIR, help="Directory to save plots"),
 ):
     """Generate plots comparing classical and deep learning models."""
@@ -58,8 +54,7 @@ def main(
 
         # Load models
         logger.info("Loading deep learning models...")
-        dataset_filter = dataset_name if use_matching_models else None
-        deep_models = predictor.load_deep_models(models_dir, dataset_name=dataset_filter)
+        deep_models = predictor.load_deep_models(models_dir, dataset_name=dataset_name)
 
         # Evaluate all methods
         logger.info("Evaluating methods...")
