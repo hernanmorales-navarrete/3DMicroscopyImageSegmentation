@@ -65,9 +65,11 @@ class Visualizer:
 
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
-            sns.violinplot(data=df, x="method", y=metric, ax=ax)
+            sns.violinplot(data=df, x="method", y=metric, ax=ax, cut=0, inner='quartile', scale='area')
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
             ax.set_title(f"{metric.replace('_', ' ').title()} Distribution")
+            ax.set_ylim(0, 1)
+            ax.grid(False)
 
         for idx in range(n_metrics, len(axes)):
             fig.delaxes(axes[idx])
@@ -92,8 +94,11 @@ class Visualizer:
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
             sns.boxplot(data=df, x="method", y=metric, ax=ax)
+            sns.stripplot(data=df, x="method", y=metric, ax=ax, jitter=True, color='black', alpha=0.6)
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
             ax.set_title(f"{metric.replace('_', ' ').title()} Distribution")
+            ax.set_ylim(0, 1)
+            ax.grid(False)
 
         for idx in range(n_metrics, len(axes)):
             fig.delaxes(axes[idx])
