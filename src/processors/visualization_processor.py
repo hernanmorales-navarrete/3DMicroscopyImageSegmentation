@@ -10,9 +10,17 @@ from loguru import logger
 class Visualizer:
     """Class for handling visualization and plotting."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, method_order: List[str] = None):
+        """Initialize the visualizer.
+
+        Args:
+            output_dir: Directory to save visualization outputs
+            method_order: Optional list of method names in the desired order for plotting.
+                        If None, methods will be plotted in their natural order from the data.
+        """
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.method_order = method_order
         sns.set_style("whitegrid")
 
     def generate_plots(
@@ -65,7 +73,11 @@ class Visualizer:
 
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
-            sns.violinplot(data=df, x="method", y=metric, ax=ax)
+            # Use the defined order for plotting if provided
+            if self.method_order is not None:
+                sns.violinplot(data=df, x="method", y=metric, ax=ax, order=self.method_order)
+            else:
+                sns.violinplot(data=df, x="method", y=metric, ax=ax)
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
             ax.set_title(f"{metric.replace('_', ' ').title()} Distribution")
 
@@ -91,7 +103,11 @@ class Visualizer:
 
         for idx, metric in enumerate(metrics):
             ax = axes[idx]
-            sns.boxplot(data=df, x="method", y=metric, ax=ax)
+            # Use the defined order for plotting if provided
+            if self.method_order is not None:
+                sns.boxplot(data=df, x="method", y=metric, ax=ax, order=self.method_order)
+            else:
+                sns.boxplot(data=df, x="method", y=metric, ax=ax)
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
             ax.set_title(f"{metric.replace('_', ' ').title()} Distribution")
 
@@ -121,6 +137,10 @@ class Visualizer:
         ]
 
         means = df.groupby("method")[metrics].mean()
+        # Reorder the means DataFrame according to method_order if provided
+        if self.method_order is not None:
+            means = means.reindex(self.method_order)
+
         num_vars = len(metrics)
         angles = [n / float(num_vars) * 2 * np.pi for n in range(num_vars)]
         angles += angles[:1]
@@ -147,8 +167,7 @@ class Visualizer:
         )
         plt.close()
 
-    @staticmethod
-    def create_summary_table(df: pd.DataFrame) -> pd.DataFrame:
+    def create_summary_table(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create summary table with mean and std metrics for each method."""
         metrics = [
             "accuracy",
@@ -171,4 +190,7 @@ class Visualizer:
                 mean_df[metric].round(3).astype(str) + " ± " + std_df[metric].round(3).astype(str)
             )
 
+        # Reorder the summary DataFrame according to method_order if provided
+        if self.method_order is not None:
+            summary = summary.reindex(self.method_order)
         return summary
