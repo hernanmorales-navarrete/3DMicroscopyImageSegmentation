@@ -2,7 +2,7 @@ from pathlib import Path
 import typer
 from loguru import logger
 
-from src.config import FIGURES_DIR, MODELS_DIR
+from src.config import FIGURES_DIR, MODELS_DIR, METHOD_ORDER
 from src.processors import Predictor, Visualizer
 from src.processors.evaluator import Evaluator
 from src.utils import configure_gpu
@@ -32,7 +32,7 @@ def main(
     try:
         # Initialize processors
         predictor = Predictor()
-        visualizer = Visualizer(output_dir)
+        visualizer = Visualizer(output_dir, method_order=METHOD_ORDER)
         evaluator = Evaluator()
 
         # Get and validate image paths

@@ -78,3 +78,16 @@ METRICS = ["accuracy"]
 # Tensorboard
 TENSORBOARD_UPDATE_FREQ = "epoch"
 PROFILE_BATCH = 0  # Disable profiling
+
+# Visualization settings
+METHOD_ORDER = [
+    "Classical_otsu",  # Otsu
+    "Classical_adaptive_gaussian",  # Adaptive Gaussian
+    "Classical_frangi",  # Frangi
+    "UNet3D_NONE",  # UNets without augmentation
+    "UNet3D_STANDARD",  # UNets with standard augmentation
+    "UNet3D_OURS",  # UNets with our augmentation
+    "AttentionUNet3D_NONE",  # UNets+attention without augmentation
+    "AttentionUNet3D_STANDARD",  # UNets+attention with standard augmentation
+    "AttentionUNet3D_OURS",  # UNets+attention with our augmentation
+]
