@@ -25,7 +25,8 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 # VARIABLES
 
 PATCH_SIZE = (64, 64, 64)
-PATCH_STEP = 64
+PATCH_STEP = 64  # Step size for regular patch extraction
+PATCH_STEP_RECONSTRUCTION = 56  # Smaller step size for overlapping patches during reconstruction
 
 # Intensity augmentation parameters
 INTENSITY_PARAMS = {
@@ -34,32 +35,32 @@ INTENSITY_PARAMS = {
     "z_decay_rate": 0.999,  # Rate of intensity decay along z-axis
     "noise_std": 0.1,  # Standard deviation for Gaussian noise
     "poisson_scale": 1.0,  # Scaling factor for Poisson noise
-    "intensity_scale": 1000.0,  # Scale factor for image intensity before augmentation
-    "snr_targets": [15, 10, 5, 4, 3, 2, 1],  # Target SNR values for augmentation
+    "intensity_scale": 1000.0,  # Scale factor for image intensity before augmentation,
+    "snr_tolerance": 0.1,  # Tolerance for SNR
+    "max_iterations": 200,  # Maximum number of iterations for intensity augmentation
+    "std_dev": 10,  # Standard deviation for Gaussian noise
+    "snr_targets": [
+        15,
+        10,
+        5,
+        4,
+        3,
+        2,
+    ],  # Target SNR values for augmentation
 }
-
-# If tqdm is installed, configure loguru with tqdm.write
-# https://github.com/Delgan/loguru/issues/135
-try:
-    from tqdm import tqdm
-
-    logger.remove(0)
-    logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True)
-except ModuleNotFoundError:
-    pass
 
 # Training Configuration
 RANDOM_SEED = 42
 AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
 
 # Training hyperparameters
-LEARNING_RATE = 1e-4
-BATCH_SIZE = 1
-NUM_EPOCHS = 50
+LEARNING_RATE = 1e-5
+BATCH_SIZE = 8
+NUM_EPOCHS = 100
 VALIDATION_SPLIT = 0.2
 
 # Early stopping parameters
-EARLY_STOPPING_PATIENCE = 10
+EARLY_STOPPING_PATIENCE = 5
 EARLY_STOPPING_MIN_DELTA = 0  # Use Keras default
 
 # Model checkpoint parameters
@@ -77,3 +78,16 @@ METRICS = ["accuracy"]
 # Tensorboard
 TENSORBOARD_UPDATE_FREQ = "epoch"
 PROFILE_BATCH = 0  # Disable profiling
+
+# Visualization settings
+METHOD_ORDER = [
+    "Classical_otsu",  # Otsu
+    "Classical_adaptive_gaussian",  # Adaptive Gaussian
+    "Classical_frangi",  # Frangi
+    "UNet3D_NONE",  # UNets without augmentation
+    "UNet3D_STANDARD",  # UNets with standard augmentation
+    "UNet3D_OURS",  # UNets with our augmentation
+    "AttentionUNet3D_NONE",  # UNets+attention without augmentation
+    "AttentionUNet3D_STANDARD",  # UNets+attention with standard augmentation
+    "AttentionUNet3D_OURS",  # UNets+attention with our augmentation
+]

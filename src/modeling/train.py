@@ -68,13 +68,19 @@ def get_model_class(model_name):
     return model_classes[model_name]
 
 
-def create_callbacks(model_name: str, augmentation: AugmentationType):
-    """Create training callbacks."""
+def create_callbacks(model_name: str, augmentation: AugmentationType, dataset_name: str):
+    """Create training callbacks.
+
+    Args:
+        model_name: Name of the model architecture
+        augmentation: Type of augmentation used
+        dataset_name: Name of the dataset used for training
+    """
     callbacks = []
 
-    # Create directories for logs and checkpoints with augmentation info
+    # Create directories for logs and checkpoints with dataset and augmentation info
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir_name = f"{model_name}_{augmentation.value}"
+    model_dir_name = f"{dataset_name}/{model_name}_{augmentation.value}"
 
     log_dir = LOGS_DIR / model_dir_name / timestamp
     checkpoint_dir = MODELS_DIR / model_dir_name / timestamp
@@ -152,6 +158,7 @@ def load_and_split_data(data_dir: Path, random_state: int = None):
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to train"),
     data_dir: Path = typer.Argument(..., help="Directory containing the dataset"),
+    dataset_name: str = typer.Argument(..., help="Name of the dataset for model organization"),
     augmentation: AugmentationType = typer.Option(
         AugmentationType.NONE,
         "--augmentation",
@@ -220,7 +227,7 @@ def main(
         metrics=METRICS,
     )
 
-    callbacks = create_callbacks(model_name, augmentation)
+    callbacks = create_callbacks(model_name, augmentation, dataset_name)
 
     logger.info("Starting training...")
     model.fit(

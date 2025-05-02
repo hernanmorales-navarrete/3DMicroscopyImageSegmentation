@@ -4,9 +4,14 @@ import numpy as np
 from loguru import logger
 import typer
 from patchify import unpatchify
+import tensorflow as tf
 
 from src.config import MODELS_DIR, REPORTS_DIR, PATCH_SIZE, PATCH_STEP
 from src.processors import Predictor
+from src.utils import configure_gpu
+
+# Configure GPU at startup
+configure_gpu()
 
 app = typer.Typer()
 
@@ -41,17 +46,20 @@ def extract_patch_info(filename):
     return image_name, orig_shape, padded_shape, n_patches
 
 
-def predict_patches(image_paths, predictor, model):
+def predict_patches(image_paths, predictor, model_path):
     """Predict segmentation for all patches using deep learning model.
 
     Args:
         image_paths: List of patch image paths
         predictor: Predictor instance
-        model: Deep learning model
+        model_path: Path to the deep learning model
 
     Returns:
         Dictionary mapping image names to (original_shape, padded_shape, n_patches, predictions) tuple
     """
+    # Load the model
+    model = tf.keras.models.load_model(model_path)
+
     # Dictionary to store patches for each original image
     image_predictions = {}
 
@@ -97,14 +105,14 @@ def main(
     ),
     dataset_name: str = typer.Argument(
         ...,
-        help="Identifier/name to distinguish and organize different sets of images - all predictions will be saved in a subdirectory with this name",
+        help="Identifier/name to distinguish and organize different sets of images - all predictions will be saved in a subdirectory with this name. Only models trained on this dataset will be used.",
     ),
     models_dir: Path = typer.Argument(MODELS_DIR, help="Directory containing trained models"),
     output_dir: Path = typer.Option(REPORTS_DIR, help="Directory to save predictions"),
 ):
     """Generate predictions using classical methods on complete images and then deep learning on patches."""
 
-    # Create output directory with dataset subdirectory
+    # Create output directory
     dataset_output_dir = output_dir / dataset_name
     dataset_output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +138,7 @@ def main(
             logger.info(f"Applying {method} method")
             prediction = predictor.predict_patch(image, method=method)
 
-            # Save prediction in dataset subdirectory
+            # Save prediction without augmentation type for classical methods
             output_path = dataset_output_dir / f"{image_name}_{method}.tif"
             predictor.save_image(prediction, output_path)
 
@@ -142,10 +150,11 @@ def main(
     logger.info(f"Found {len(patch_paths)} patches for deep learning")
 
     # Load and apply deep learning models
-    deep_models = predictor.load_deep_models(models_dir)
-    for model_name, model in deep_models.items():
-        logger.info(f"Processing deep learning model: {model_name}")
-        predictions = predict_patches(patch_paths, predictor, model)
+    deep_models = predictor.load_deep_models(models_dir, dataset_name=dataset_name)
+
+    for model_name, (model_path, augmentation_type) in deep_models.items():
+        logger.info(f"Processing deep learning model: {model_name} ({augmentation_type})")
+        predictions = predict_patches(patch_paths, predictor, model_path)
 
         # Reconstruct and save each image
         for image_name, (
@@ -164,8 +173,8 @@ def main(
             # Crop back to original size
             reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
 
-            # Save reconstructed image in dataset subdirectory
-            output_path = dataset_output_dir / f"{image_name}_{model_name}.tif"
+            # Save reconstructed image with augmentation type only for deep learning
+            output_path = dataset_output_dir / f"{image_name}_{model_name}_{augmentation_type}.tif"
             predictor.save_image(reconstructed, output_path)
 
     logger.success(

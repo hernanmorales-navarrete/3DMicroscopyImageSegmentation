@@ -4,6 +4,7 @@ data/
 *.tif
 *.keras
 models/
+reports/
 
 # Python
 __pycache__/
