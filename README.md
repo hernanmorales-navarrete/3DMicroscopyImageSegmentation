@@ -23,16 +23,19 @@ python src/generate_patches.py DATASET_DIR FOR_RECONSTRUCTION
 
 Required arguments:
 - DATASET_DIR: Directory containing the dataset with 'images' and 'masks' subdirectories
-- FOR_RECONSTRUCTION: Whether to generate overlapping patches suitable for image reconstruction (true/false)
+- FOR_RECONSTRUCTION: Whether to generate overlapping patches suitable for image reconstruction
 ```
 
 Example commands:
 ```bash
 # For training data (without overlap)
-python src/generate_patches.py /path/to/dataset false
+python src/generate_patches.py data/processed/BC/training_data False
 
-# For prediction/reconstruction (with overlap)
-python src/generate_patches.py /path/to/dataset true
+# For test data (with overlap for reconstruction)
+python src/generate_patches.py data/processed/BC/test_data True
+
+# For test data (without overlap for evaluation)
+python src/generate_patches.py data/processed/BC/test_data False
 ```
 
 Your input dataset must have this structure:
@@ -64,18 +67,26 @@ Optional arguments:
   - STANDARD: Basic augmentation
   - OURS: Advanced microscopy-specific augmentation
 - --psf, -p PATH: Path to PSF file for microscopy augmentations
-- --enable-reproducibility/--no-enable-reproducibility: Enable/disable reproducibility [default: enabled]
+- --enable-reproducibility/--no-enable-reproducibility: Enable reproducibility by setting random seeds [default: True]
 ```
 
 Example commands:
 ```bash
 # Basic training without augmentation
-python src/modeling/train.py UNet3D /path/to/patches my_dataset
+python src/modeling/train.py UNet3D data/processed/BC/training_data/regular_patches BC --augmentation NONE
+
+# Training with standard augmentation
+python src/modeling/train.py UNet3D data/processed/BC/training_data/regular_patches BC --augmentation STANDARD
 
 # Training with advanced augmentation and PSF
-python src/modeling/train.py UNet3D /path/to/patches my_dataset \
-    -a OURS \
+python src/modeling/train.py UNet3D data/processed/BC/training_data/regular_patches BC \
+    --augmentation OURS \
     --psf data/external/PSF.tif
+
+# For mouse dataset, use specific PSF
+python src/modeling/train.py UNet3D data/processed/mouse/training_data/regular_patches mouse \
+    --augmentation OURS \
+    --psf data/external/PSF_mouse.tif
 ```
 
 ### 3. Generate Predictions (`predict.py`)
@@ -83,25 +94,25 @@ python src/modeling/train.py UNet3D /path/to/patches my_dataset \
 Generate segmentation predictions using trained models:
 
 ```bash
-python src/modeling/predict.py PATCHES_DIR COMPLETE_IMAGES_DIR DATASET_NAME [OPTIONS]
+python src/modeling/predict.py PATCHES_DIR COMPLETE_IMAGES_DIR DATASET_NAME MODELS_DIR [OPTIONS]
 
 Required arguments:
 - PATCHES_DIR: Directory containing image patches for deep learning methods
 - COMPLETE_IMAGES_DIR: Directory containing complete images for classical methods
 - DATASET_NAME: Identifier to organize different sets of images and select appropriate models
+- MODELS_DIR: Directory containing trained models [default: models/]
 
 Optional arguments:
-- --models-dir: Directory containing trained models [default: models/]
 - --output-dir: Directory to save predictions [default: reports/]
 ```
 
 Example command:
 ```bash
 python src/modeling/predict.py \
-    /path/to/patches \
-    /path/to/complete_images \
-    my_dataset \
-    --output-dir /path/to/predictions
+    data/processed/BC/test_data/reconstruction_patches \
+    data/processed/BC/test_data \
+    BC \
+    models/
 ```
 
 ### 4. Generate Plots (`plots.py`)
@@ -109,27 +120,35 @@ python src/modeling/predict.py \
 Generate comparison plots and metrics between different methods:
 
 ```bash
-python src/plots.py RECONSTRUCTION_PATCHES_DIR REGULAR_PATCHES_DIR COMPLETE_IMAGES_DIR DATASET_NAME [OPTIONS]
+python src/plots.py RECONSTRUCTION_PATCHES_DIR REGULAR_PATCHES_DIR COMPLETE_IMAGES_DIR DATASET_NAME MODELS_DIR [OPTIONS]
 
 Required arguments:
 - RECONSTRUCTION_PATCHES_DIR: Directory containing reconstruction patches (with overlap) for evaluating deep learning methods on complete images
 - REGULAR_PATCHES_DIR: Directory containing regular patches (no overlap) for patch-level evaluation of all methods
 - COMPLETE_IMAGES_DIR: Directory containing complete images for classical methods
-- DATASET_NAME: Identifier to distinguish and organize different sets of images
+- DATASET_NAME: Identifier to distinguish and organize different sets of images (only models trained on this dataset will be used)
+- MODELS_DIR: Directory containing trained models [default: models/]
 
 Optional arguments:
-- --models-dir: Directory containing trained models [default: models/]
 - --output-dir: Directory to save plots [default: reports/figures/]
 ```
+
+The tool evaluates methods in two ways:
+- For deep learning methods:
+  - Complete image evaluation uses reconstruction patches (with overlap)
+  - Patch-level evaluation uses regular patches (no overlap)
+- For classical methods:
+  - Complete image evaluation uses the complete images
+  - Patch-level evaluation uses regular patches (no overlap)
 
 Example command:
 ```bash
 python src/plots.py \
-    /path/to/reconstruction_patches \
-    /path/to/regular_patches \
-    /path/to/complete_images \
-    my_dataset \
-    --output-dir /path/to/plots
+    data/processed/BC/test_data/reconstruction_patches \
+    data/processed/BC/test_data/regular_patches \
+    data/processed/BC/test_data \
+    BC \
+    models/
 ```
 
 ## Configuration
