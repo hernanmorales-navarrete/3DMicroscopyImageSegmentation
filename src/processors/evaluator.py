@@ -130,6 +130,7 @@ class Evaluator:
         augmentation_type: str,
         patch_paths: List[Path],
         patch_masks: List[Path],
+        evaluation_type: str = "complete",
     ) -> List[Dict[str, Any]]:
         """Evaluate a deep learning model on patches and reconstructed images.
 
@@ -139,6 +140,7 @@ class Evaluator:
             augmentation_type: Type of augmentation used
             patch_paths: List of paths to patch images
             patch_masks: List of paths to patch mask files
+            evaluation_type: Type of evaluation (complete or patch)
 
         Returns:
             List of evaluation results
@@ -160,41 +162,50 @@ class Evaluator:
                 desc=f"Processing patches for {model_name}",
             ):
                 try:
-                    # Extract patch information
-                    image_name, orig_shape, padded_shape, n_patches = self.extract_patch_info(
-                        img_path
-                    )
-                    patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
+                    if evaluation_type == "complete":
+                        # For complete image evaluation, we need patch info for reconstruction
+                        image_name, orig_shape, padded_shape, n_patches = self.extract_patch_info(
+                            img_path
+                        )
+                        patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
 
-                    # Store image metadata
-                    if image_name not in image_data:
-                        image_data[image_name] = {
-                            "orig_shape": orig_shape,
-                            "padded_shape": padded_shape,
-                            "n_patches": n_patches,
-                            "mask_patches": [],
-                        }
+                        # Store image metadata
+                        if image_name not in image_data:
+                            image_data[image_name] = {
+                                "orig_shape": orig_shape,
+                                "padded_shape": padded_shape,
+                                "n_patches": n_patches,
+                                "mask_patches": [],
+                            }
 
-                    # Load image and mask
-                    image = self.predictor.load_image(img_path)
-                    mask = self.predictor.load_image(mask_path)
-                    image_data[image_name]["mask_patches"].append((patch_idx, mask))
+                        # Load image and mask
+                        image = self.predictor.load_image(img_path)
+                        mask = self.predictor.load_image(mask_path)
+                        image_data[image_name]["mask_patches"].append((patch_idx, mask))
 
-                    # Add to current batch
-                    current_batch.append((image_name, image, mask, patch_idx))
+                        # Add to current batch
+                        current_batch.append((image_name, image, mask, patch_idx))
+                    else:  # patch evaluation
+                        # For patch evaluation, we don't need reconstruction info
+                        image = self.predictor.load_image(img_path)
+                        mask = self.predictor.load_image(mask_path)
+                        current_batch.append((str(img_path), image, mask, 0))
 
                     # Process batch when it reaches BATCH_SIZE
                     if len(current_batch) == BATCH_SIZE:
                         batch_results, batch_predictions = self.process_deep_learning_batch(
                             current_batch, model, model_name, augmentation_type
                         )
-                        all_results.extend(batch_results)
 
-                        # Update predictions dictionary
-                        for img_name, preds in batch_predictions.items():
-                            if img_name not in image_predictions:
-                                image_predictions[img_name] = []
-                            image_predictions[img_name].extend(preds)
+                        if evaluation_type == "complete":
+                            # For complete evaluation, store predictions for reconstruction
+                            for img_name, preds in batch_predictions.items():
+                                if img_name not in image_predictions:
+                                    image_predictions[img_name] = []
+                                image_predictions[img_name].extend(preds)
+                        else:  # patch evaluation
+                            # For patch evaluation, store patch-level results
+                            all_results.extend(batch_results)
 
                         current_batch = []
 
@@ -207,46 +218,50 @@ class Evaluator:
                 batch_results, batch_predictions = self.process_deep_learning_batch(
                     current_batch, model, model_name, augmentation_type
                 )
-                all_results.extend(batch_results)
 
-                # Update predictions dictionary
-                for img_name, preds in batch_predictions.items():
-                    if img_name not in image_predictions:
-                        image_predictions[img_name] = []
-                    image_predictions[img_name].extend(preds)
+                if evaluation_type == "complete":
+                    # For complete evaluation, store predictions for reconstruction
+                    for img_name, preds in batch_predictions.items():
+                        if img_name not in image_predictions:
+                            image_predictions[img_name] = []
+                        image_predictions[img_name].extend(preds)
+                else:  # patch evaluation
+                    # For patch evaluation, store patch-level results
+                    all_results.extend(batch_results)
 
-            # Evaluate complete images
-            logger.info(f"Evaluating complete images for {model_name}")
-            for image_name, data in image_data.items():
-                if image_name not in image_predictions:
-                    continue
+            # For complete evaluation, reconstruct and evaluate complete images
+            if evaluation_type == "complete":
+                logger.info(f"Evaluating complete images for {model_name}")
+                for image_name, data in image_data.items():
+                    if image_name not in image_predictions:
+                        continue
 
-                # Sort predictions and masks by patch index
-                sorted_preds = [
-                    p[1] for p in sorted(image_predictions[image_name], key=lambda x: x[0])
-                ]
-                sorted_masks = [m[1] for m in sorted(data["mask_patches"], key=lambda x: x[0])]
+                    # Sort predictions and masks by patch index
+                    sorted_preds = [
+                        p[1] for p in sorted(image_predictions[image_name], key=lambda x: x[0])
+                    ]
+                    sorted_masks = [m[1] for m in sorted(data["mask_patches"], key=lambda x: x[0])]
 
-                # Reconstruct complete image and mask
-                reconstructed_pred = self.reconstruct_complete_image(
-                    sorted_preds, data["orig_shape"], data["padded_shape"], data["n_patches"]
-                )
-                reconstructed_mask = self.reconstruct_complete_image(
-                    sorted_masks, data["orig_shape"], data["padded_shape"], data["n_patches"]
-                )
+                    # Reconstruct complete image and mask
+                    reconstructed_pred = self.reconstruct_complete_image(
+                        sorted_preds, data["orig_shape"], data["padded_shape"], data["n_patches"]
+                    )
+                    reconstructed_mask = self.reconstruct_complete_image(
+                        sorted_masks, data["orig_shape"], data["padded_shape"], data["n_patches"]
+                    )
 
-                # Evaluate complete image
-                mask_binary = self.metrics.ensure_binary_mask(reconstructed_mask)
-                result = self.metrics.compute_metrics(mask_binary, reconstructed_pred)
-                result.update(
-                    {
-                        "method": model_name,
-                        "augmentation": augmentation_type,
-                        "image_path": image_name,
-                        "evaluation_type": "complete",
-                    }
-                )
-                all_results.append(result)
+                    # Evaluate complete image
+                    mask_binary = self.metrics.ensure_binary_mask(reconstructed_mask)
+                    result = self.metrics.compute_metrics(mask_binary, reconstructed_pred)
+                    result.update(
+                        {
+                            "method": model_name,
+                            "augmentation": augmentation_type,
+                            "image_path": image_name,
+                            "evaluation_type": evaluation_type,
+                        }
+                    )
+                    all_results.append(result)
 
         finally:
             # Clean up
@@ -323,8 +338,10 @@ class Evaluator:
 
     def evaluate_all_methods(
         self,
-        patch_paths: List[Path],
-        patch_masks: List[Path],
+        regular_patch_paths: List[Path],
+        regular_patch_masks: List[Path],
+        reconstruction_patch_paths: List[Path],
+        reconstruction_patch_masks: List[Path],
         complete_image_paths: List[Path],
         complete_masks: List[Path],
         deep_models: Dict[str, Tuple[str, str]],
@@ -332,8 +349,10 @@ class Evaluator:
         """Evaluate all methods on patches and complete images.
 
         Args:
-            patch_paths: List of paths to patch image files
-            patch_masks: List of paths to patch mask files
+            regular_patch_paths: List of paths to regular patch image files (for patch-level evaluation)
+            regular_patch_masks: List of paths to regular patch mask files (for patch-level evaluation)
+            reconstruction_patch_paths: List of paths to reconstruction patch image files (for complete image evaluation)
+            reconstruction_patch_masks: List of paths to reconstruction patch mask files (for complete image evaluation)
             complete_image_paths: List of paths to complete image files
             complete_masks: List of paths to complete mask files
             deep_models: Dictionary mapping model names to tuples of (model_path, augmentation_type)
@@ -347,8 +366,25 @@ class Evaluator:
         logger.info("Processing deep learning models...")
         for model_name, (model_path, augmentation_type) in deep_models.items():
             try:
+                # Evaluate on complete images using reconstruction patches
                 results = self.evaluate_deep_learning_model(
-                    model_name, model_path, augmentation_type, patch_paths, patch_masks
+                    model_name,
+                    model_path,
+                    augmentation_type,
+                    reconstruction_patch_paths,
+                    reconstruction_patch_masks,
+                    evaluation_type="complete",
+                )
+                all_results.extend(results)
+
+                # Evaluate on regular patches
+                results = self.evaluate_deep_learning_model(
+                    model_name,
+                    model_path,
+                    augmentation_type,
+                    regular_patch_paths,
+                    regular_patch_masks,
+                    evaluation_type="patch",
                 )
                 all_results.extend(results)
             except Exception as e:
