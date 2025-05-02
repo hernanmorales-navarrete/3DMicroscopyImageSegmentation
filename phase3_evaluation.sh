@@ -20,7 +20,7 @@ for dataset_dir in "${DATASETS[@]}"; do
     test_dir="${dataset_dir}/test_data"
     
     echo "Generating evaluation plots for ${dataset_name}..."
-    python src/plots.py "${test_dir}/regular_patches" "${test_dir}" "${dataset_name}"
+    python src/plots.py "${test_dir}/reconstruction_patches" "${test_dir}/regular_patches" "${test_dir}" "${dataset_name}"
     
     echo "Completed evaluation for dataset: ${dataset_name}"
     echo "----------------------------------------"
