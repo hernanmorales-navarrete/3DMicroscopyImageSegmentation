@@ -199,10 +199,20 @@ class Visualizer:
             "volume_similarity",
         ]
 
+        # Calculate mean and std for metrics
         mean_df = df.groupby("method")[metrics].mean()
         std_df = df.groupby("method")[metrics].std()
 
-        summary = pd.DataFrame(index=mean_df.index, columns=metrics)
+        # Get patch counts
+        patch_counts = df.groupby("method").size()
+
+        # Create summary DataFrame
+        summary = pd.DataFrame(index=mean_df.index, columns=["n_patches"] + metrics)
+
+        # Add patch counts
+        summary["n_patches"] = patch_counts
+
+        # Add metrics with mean ± std format
         for metric in metrics:
             summary[metric] = (
                 mean_df[metric].round(3).astype(str) + " ± " + std_df[metric].round(3).astype(str)
@@ -211,4 +221,5 @@ class Visualizer:
         # Reorder the summary DataFrame according to method_order if provided
         if self.method_order is not None:
             summary = summary.reindex(self.method_order)
+
         return summary

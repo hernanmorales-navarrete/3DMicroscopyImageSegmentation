@@ -102,6 +102,9 @@ def main(
             deep_models=deep_models,
         )
 
+        # Add patch count information to results
+        results_df["n_patches"] = results_df.groupby("method")["method"].transform("count")
+
         # Define metrics to plot
         metrics = [
             "accuracy",
