@@ -52,7 +52,7 @@ class Visualizer:
 
             # Use violin plots for patches and box plots for complete images
             if eval_type == "patch":
-                self.plot_violin(type_results, metrics, f"{dataset_name}_patches")
+                self.plot_box(type_results, metrics, f"{dataset_name}_patches")
                 self.plot_radar_chart(type_results, f"{dataset_name}_patches")
                 summary = self.create_summary_table(type_results)
                 summary.to_csv(dataset_output_dir / f"metrics_summary_{dataset_name}_patches.csv")
