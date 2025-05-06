@@ -52,12 +52,12 @@ class Visualizer:
 
             # Use violin plots for patches and box plots for complete images
             if eval_type == "patch":
-                self.plot_box(type_results, metrics, f"{dataset_name}_patches")
+                self.plot_box(type_results, metrics, f"{dataset_name}_patches", False)
                 self.plot_radar_chart(type_results, f"{dataset_name}_patches")
                 summary = self.create_summary_table(type_results)
                 summary.to_csv(dataset_output_dir / f"metrics_summary_{dataset_name}_patches.csv")
             else:  # complete images
-                self.plot_box(type_results, metrics, f"{dataset_name}_complete")
+                self.plot_box(type_results, metrics, f"{dataset_name}_complete", True)
                 self.plot_radar_chart(type_results, f"{dataset_name}_complete")
                 summary = self.create_summary_table(type_results)
                 summary.to_csv(dataset_output_dir / f"metrics_summary_{dataset_name}_complete.csv")
@@ -105,7 +105,7 @@ class Visualizer:
         )
         plt.close()
 
-    def plot_box(self, df: pd.DataFrame, metrics: List[str], dataset_name: str) -> None:
+    def plot_box(self, df: pd.DataFrame, metrics: List[str], dataset_name: str, plot_points: bool) -> None:
         """Create box plots for metrics."""
         n_metrics = len(metrics)
         n_cols = 3
