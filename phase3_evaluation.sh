@@ -8,7 +8,7 @@ echo "==================================="
 
 # Hardcoded dataset paths
 declare -a DATASETS=(
-    "data/processed/mouse"
+    "data/processed/microvascular"
     "data/processed/Sinusoids_filled"
     "data/processed/BC"
     "data/processed/Sinusoids"
