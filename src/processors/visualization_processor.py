@@ -105,7 +105,9 @@ class Visualizer:
         )
         plt.close()
 
-    def plot_box(self, df: pd.DataFrame, metrics: List[str], dataset_name: str, plot_points: bool) -> None:
+    def plot_box(
+        self, df: pd.DataFrame, metrics: List[str], dataset_name: str, plot_points: bool
+    ) -> None:
         """Create box plots for metrics."""
         n_metrics = len(metrics)
         n_cols = 3
@@ -118,11 +120,15 @@ class Visualizer:
             ax = axes[idx]
             # Use the defined order for plotting if provided
             if self.method_order is not None:
-                sns.boxplot(data=df, x="method", y=metric, ax=ax, order=self.method_order, showfliers=True)
+                sns.boxplot(
+                    data=df, x="method", y=metric, ax=ax, order=self.method_order, showfliers=True
+                )
             else:
                 sns.boxplot(data=df, x="method", y=metric, ax=ax, showfliers=True)
-            if plot_points:     
-                sns.stripplot(data=df, x="method", y=metric, ax=ax, jitter=True, color="black", alpha=0.6)
+            if plot_points:
+                sns.stripplot(
+                    data=df, x="method", y=metric, ax=ax, jitter=True, color="black", alpha=0.6
+                )
             ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
             ax.set_title(f"{metric.replace('_', ' ').title()} Distribution")
             ax.set_ylim(0, 1)
