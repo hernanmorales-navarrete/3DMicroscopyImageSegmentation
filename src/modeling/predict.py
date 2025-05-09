@@ -26,7 +26,7 @@ def extract_patch_info(filename):
         tuple: (image_name, original_shape, padded_shape, n_patches)
     """
     # Extract information using regex
-    pattern = r"(.+)_orig_(\d+)_(\d+)_(\d+)(?:_pad_(\d+)_(\d+)_(\d+))?_npatches_(\d+)_(\d+)_(\d+)_patch_\d+\.tif"
+    pattern = r"(.+)_orig_(\d+)_(\d+)_(\d+)(?:_pad_(\d+)_(\d+)_(\d+))?_npatches_(\d+)_(\d+)_(\d+)_patch_\d+\.tiff?"
     match = re.match(pattern, filename.name)
 
     if not match:
@@ -68,7 +68,7 @@ def predict_patches(image_paths, predictor, model_path):
     for img_path in image_paths:
         # Extract patch information and patch index
         image_name, orig_shape, padded_shape, n_patches = extract_patch_info(img_path)
-        patch_idx = int(re.search(r"patch_(\d+)\.tif$", img_path.name).group(1))
+        patch_idx = int(re.search(r"patch_(\d+)\.tiff?$", img_path.name).group(1))
 
         # Initialize predictions dictionary for this image if needed
         if image_name not in image_predictions:
@@ -120,9 +120,9 @@ def main(
     predictor = Predictor()
 
     # Process classical methods with complete images first
-    complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
+    complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif*"))
     if not complete_image_paths:
-        raise ValueError(f"No .tif files found in {complete_images_dir}/images/")
+        raise ValueError(f"No .tif or .tiff files found in {complete_images_dir}/images/")
 
     logger.info(f"Found {len(complete_image_paths)} complete images for classical methods")
 
@@ -143,9 +143,9 @@ def main(
             predictor.save_image(prediction, output_path)
 
     # Then process deep learning methods with patches
-    patch_paths = sorted(patches_dir.glob("images/**/*.tif"))
+    patch_paths = sorted(patches_dir.glob("images/**/*.tif*"))
     if not patch_paths:
-        raise ValueError(f"No .tif files found in {patches_dir}/images/")
+        raise ValueError(f"No .tif or .tiff files found in {patches_dir}/images/")
 
     logger.info(f"Found {len(patch_paths)} patches for deep learning")
 
