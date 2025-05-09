@@ -73,10 +73,10 @@ class Evaluator:
                     ( (p - o) // 2, p - o - ( (p - o) // 2 ) )
                     for p, o in zip(padded_shape, orig_shape)
                   ]
-        reconstructed = reconstructed[
-                                padding[0][0] : -padding[0][1],
-                                padding[1][0] : -padding[1][1],
-                                padding[2][0] : -padding[2][1]
+        reconstructed_image = reconstructed_image[
+                                padding[0][0] : orig_shape[0]+padding[0][0],
+                                padding[1][0] : orig_shape[1]+padding[1][0],
+                                padding[2][0] : orig_shape[1]+padding[2][0]
                             ]     
         return reconstructed
 
