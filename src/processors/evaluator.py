@@ -69,7 +69,16 @@ class Evaluator:
             n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
         )
         reconstructed = unpatchify(patches_reshaped, padded_shape)
-        return reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
+        padding = [
+                    ( (p - o) // 2, p - o - ( (p - o) // 2 ) )
+                    for p, o in zip(padded_shape, orig_shape)
+                  ]
+        reconstructed_image = reconstructed_image[
+                                padding[0][0] : orig_shape[0]+padding[0][0],
+                                padding[1][0] : orig_shape[1]+padding[1][0],
+                                padding[2][0] : orig_shape[1]+padding[2][0]
+                            ]     
+        return reconstructed
 
     def process_deep_learning_batch(
         self,
