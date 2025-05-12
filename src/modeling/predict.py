@@ -171,8 +171,16 @@ def main(
             reconstructed = unpatchify(patches_reshaped, padded_shape)
 
             # Crop back to original size
-            reconstructed = reconstructed[: orig_shape[0], : orig_shape[1], : orig_shape[2]]
-
+            padding = [
+                        ( (p - o) // 2, p - o - ( (p - o) // 2 ) )
+                        for p, o in zip(padded_shape, orig_shape)
+                      ]
+            reconstructed = reconstructed[
+                                padding[0][0] : orig_shape[0]+padding[0][0],
+                                padding[1][0] : orig_shape[1]+padding[1][0],
+                                padding[2][0] : orig_shape[1]+padding[2][0]
+                            ]  
+        
             # Save reconstructed image with augmentation type only for deep learning
             output_path = dataset_output_dir / f"{image_name}_{model_name}_{augmentation_type}.tif"
             predictor.save_image(reconstructed, output_path)
