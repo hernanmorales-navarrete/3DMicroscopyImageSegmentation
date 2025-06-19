@@ -12,6 +12,7 @@ declare -a DATASETS=(
     "data/processed/Sinusoids_filled"
     "data/processed/BC"
     "data/processed/Sinusoids"
+    "data/processed/vessels"
 )
 
 # Second phase: Generate predictions for all datasets

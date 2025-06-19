@@ -12,6 +12,7 @@ declare -a DATASETS=(
     "data/processed/Sinusoids_filled"
     "data/processed/BC"
     "data/processed/Sinusoids"
+    "data/processed/vessels"
 )
 
 # Third phase: Generate evaluation plots for all datasets

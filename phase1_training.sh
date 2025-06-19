@@ -12,6 +12,7 @@ declare -a DATASETS=(
     "data/processed/Sinusoids_filled"
     "data/processed/BC"
     "data/processed/Sinusoids"
+    "data/processed/vessels"
 )
 
 # First phase: Prepare data and train models for all datasets
