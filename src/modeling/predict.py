@@ -95,20 +95,7 @@ def predict_patches(image_paths, predictor, model_path):
 
     return image_predictions
 
-def calculate_padding_from_step(
-    image_shape: Tuple[int, int, int],
-    patch_size: Tuple[int, int, int],
-    step_size: int
-) -> Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]]:
-    padding = []
-    for dim, patch_dim in zip(image_shape, patch_size):
-        remainder = (dim - patch_dim) % step_size
-        pad_total = 0 if remainder == 0 else step_size - remainder
-        pad_before = pad_total // 2
-        pad_after = pad_total - pad_before
-        padding.append((pad_before, pad_after))
-    return tuple(padding)
-    
+
 @app.command()
 def main(
     patches_dir: Path = typer.Argument(
@@ -140,7 +127,6 @@ def main(
 
     logger.info(f"Found {len(complete_image_paths)} complete images for classical methods")
 
-
     # Process each complete image with classical methods
     for image_path in complete_image_paths:
         image_name = image_path.stem
@@ -155,8 +141,7 @@ def main(
 
             # Save prediction without augmentation type for classical methods
             output_path = dataset_output_dir / f"{image_name}_{method}.tif"
-            predictor.save_image(prediction, output_path)    
-            
+            predictor.save_image(prediction, output_path)
 
     # Then process deep learning methods with patches
     patch_paths = sorted(patches_dir.glob("images/**/*.tif*"))
@@ -180,25 +165,14 @@ def main(
             patches_array,
         ) in predictions.items():
             patches_reshaped = patches_array.reshape(
-                n_patches[0], n_patches[1], n_patches[2], * PATCH_SIZE
+                n_patches[0], n_patches[1], n_patches[2], *PATCH_SIZE
             )
 
             # Reconstruct full image using unpatchify with padded shape
             reconstructed = unpatchify(patches_reshaped, padded_shape)
-            print("padded images shape: ", reconstructed.shape, "papped size: ", padded_shape)
+            print("padded images shape: ", reconstructed.shape, "padded size: ", padded_shape)
 
-            # Crop back to original size
-            padding = calculate_padding_from_step(orig_shape, PATCH_SIZE, PATCH_STEP)
-            #padding = [
-            #            ( (p - o) // 2, p - o - ( (p - o) // 2 ) )
-            #            for p, o in zip(padded_shape, orig_shape)
-            #          ]
-            print("padding: ", padding)
-            reconstructed = reconstructed[
-                                padding[0][0] : orig_shape[0]+padding[0][0],
-                                padding[1][0] : orig_shape[1]+padding[1][0],
-                                padding[2][0] : orig_shape[1]+padding[2][0]
-                            ]  
+            reconstructed = reconstructed[0 : orig_shape[0], 0 : orig_shape[1], 0 : orig_shape[2]]
             print("unpadded images shape: ", reconstructed.shape, ", original size: ", orig_shape)
             # Save reconstructed image with augmentation type only for deep learning
             output_path = dataset_output_dir / f"{image_name}_{model_name}_{augmentation_type}.tif"
