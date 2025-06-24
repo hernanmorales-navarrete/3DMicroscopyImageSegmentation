@@ -126,8 +126,8 @@ def generate_patches(
                 logger.info(f"Applying padding for reconstruction to {img_path.name}: {padding}")
 
                 # Apply padding to both image and mask
-                img = np.pad(img, padding, constant_values=0)
-                mask = np.pad(mask, padding, constant_values=0)
+                img = np.pad(img, padding, mode="reflect")
+                mask = np.pad(mask, padding, mode="reflect")
 
                 logger.info(f"Padded Image Size {img.shape}")
 
