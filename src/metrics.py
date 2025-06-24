@@ -68,11 +68,11 @@ def apply_classical_threshold(image, method="otsu"):
         _, mask = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     elif method == "adaptive_mean":
         mask = cv2.adaptiveThreshold(
-            image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 21, 10
+            image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 31, 20
         )
     elif method == "adaptive_gaussian":
         mask = cv2.adaptiveThreshold(
-            image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 10
+            image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 20
         )
     elif method == "binary":
         _, mask = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)

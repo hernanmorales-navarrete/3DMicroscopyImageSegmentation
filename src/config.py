@@ -83,6 +83,7 @@ PROFILE_BATCH = 0  # Disable profiling
 METHOD_ORDER = [
     "Classical_otsu",  # Otsu
     "Classical_adaptive_gaussian",  # Adaptive Gaussian
+    "Classical_adaptive_mean",  # Adaptive Mean
     "Classical_frangi",  # Frangi
     "UNet3D_NONE",  # UNets without augmentation
     "UNet3D_STANDARD",  # UNets with standard augmentation

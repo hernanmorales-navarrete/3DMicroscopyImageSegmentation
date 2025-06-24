@@ -50,11 +50,11 @@ def main(
         evaluator = Evaluator()
 
         # Get and validate reconstruction patches (for deep learning complete image evaluation)
-        reconstruction_patch_paths = sorted(reconstruction_patches_dir.glob("images/**/*.tif"))
-        reconstruction_patch_masks = sorted(reconstruction_patches_dir.glob("masks/**/*.tif"))
+        reconstruction_patch_paths = sorted(reconstruction_patches_dir.glob("images/**/*.tif*"))
+        reconstruction_patch_masks = sorted(reconstruction_patches_dir.glob("masks/**/*.tif*"))
         if not reconstruction_patch_paths or not reconstruction_patch_masks:
             raise ValueError(
-                f"No .tif files found in {reconstruction_patches_dir}/images/ or {reconstruction_patches_dir}/masks/"
+                f"No .tif or .tiff files found in {reconstruction_patches_dir}/images/ or {reconstruction_patches_dir}/masks/"
             )
         if len(reconstruction_patch_paths) != len(reconstruction_patch_masks):
             raise ValueError(
@@ -65,22 +65,22 @@ def main(
         )
 
         # Get and validate regular patches (for patch-level evaluation)
-        regular_patch_paths = sorted(regular_patches_dir.glob("images/**/*.tif"))
-        regular_patch_masks = sorted(regular_patches_dir.glob("masks/**/*.tif"))
+        regular_patch_paths = sorted(regular_patches_dir.glob("images/**/*.tif*"))
+        regular_patch_masks = sorted(regular_patches_dir.glob("masks/**/*.tif*"))
         if not regular_patch_paths or not regular_patch_masks:
             raise ValueError(
-                f"No .tif files found in {regular_patches_dir}/images/ or {regular_patches_dir}/masks/"
+                f"No .tif or .tiff files found in {regular_patches_dir}/images/ or {regular_patches_dir}/masks/"
             )
         if len(regular_patch_paths) != len(regular_patch_masks):
             raise ValueError("Number of regular patch images does not match number of patch masks")
         logger.info(f"Found {len(regular_patch_paths)} regular patch image-mask pairs")
 
         # Get and validate complete images (for classical methods)
-        complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif"))
-        complete_masks = sorted(complete_images_dir.glob("masks/**/*.tif"))
+        complete_image_paths = sorted(complete_images_dir.glob("images/**/*.tif*"))
+        complete_masks = sorted(complete_images_dir.glob("masks/**/*.tif*"))
         if not complete_image_paths or not complete_masks:
             raise ValueError(
-                f"No .tif files found in {complete_images_dir}/images/ or {complete_images_dir}/masks/"
+                f"No .tif or .tiff files found in {complete_images_dir}/images/ or {complete_images_dir}/masks/"
             )
         if len(complete_image_paths) != len(complete_masks):
             raise ValueError("Number of complete images does not match number of complete masks")

@@ -7,6 +7,7 @@ from typing import Union, Tuple
 from patchify import patchify
 from loguru import logger
 from tqdm.auto import tqdm
+import shutil
 
 from src.config import PATCH_SIZE, PATCH_STEP, PATCH_STEP_RECONSTRUCTION
 
@@ -29,16 +30,8 @@ def calculate_padding(
     """
     padding = []
     for dim, patch_dim in zip(image_shape, patch_size):
-        # Calculate how much is missing for the dimension to be perfectly divisible
         remainder = (dim - patch_dim) % step_size
-        if remainder == 0:
-            pad_total = 0
-        else:
-            pad_total = step_size - remainder
-        # Split padding evenly between before and after
-        pad_before = pad_total // 2
-        pad_after = pad_total - pad_before
-        padding.append((pad_before, pad_after))
+        padding.append((0, step_size - remainder))
     return tuple(padding)
 
 
@@ -77,7 +70,13 @@ def generate_patches(
     # Create output directories
     prefix = "reconstruction" if for_reconstruction else "regular"
     patches_dir = dataset_dir / f"{prefix}_{output_subdir}"
-    patches_dir.mkdir(exist_ok=True, parents=True)
+
+    try:
+        patches_dir.mkdir(exist_ok=False, parents=True)
+    except:
+        logger.info(f"Existing directory {patches_dir}. Deleting it")
+        shutil.rmtree(patches_dir)
+
     patches_images_dir = patches_dir / "images"
     patches_masks_dir = patches_dir / "masks"
     patches_images_dir.mkdir(exist_ok=True, parents=True)
@@ -119,6 +118,7 @@ def generate_patches(
 
             # Store original shape before any padding
             orig_shape = img.shape
+            logger.info(f"Image File: {img_path}, Original Image Size {orig_shape}")
 
             if for_reconstruction:
                 # Calculate required padding for reconstruction
@@ -128,6 +128,8 @@ def generate_patches(
                 # Apply padding to both image and mask
                 img = np.pad(img, padding, mode="reflect")
                 mask = np.pad(mask, padding, mode="reflect")
+
+                logger.info(f"Padded Image Size {img.shape}")
 
             # Generate 3D patches
             img_patches = patchify(img, patch_size, step=step_size)
