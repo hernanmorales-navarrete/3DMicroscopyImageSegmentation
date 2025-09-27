@@ -10,3 +10,4 @@ scikit-image
 albumentations
 pandas
 seaborn
+notebook
