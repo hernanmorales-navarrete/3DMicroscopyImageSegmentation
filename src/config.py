@@ -10,6 +10,8 @@ load_dotenv()
 PROJ_ROOT = Path(__file__).resolve().parents[1]
 logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
 
+allowed_extensions = (".tiff", ".tif")
+
 DATA_DIR = PROJ_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 INTERIM_DATA_DIR = DATA_DIR / "interim"
@@ -26,7 +28,8 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 
 PATCH_SIZE = (64, 64, 64)
 PATCH_STEP = 64  # Step size for regular patch extraction
-PATCH_STEP_RECONSTRUCTION = 56  # Smaller step size for overlapping patches during reconstruction
+
+MAX_WORKERS = 16 # Number of cores used in multiprocessing tasks
 
 # Intensity augmentation parameters
 INTENSITY_PARAMS = {
