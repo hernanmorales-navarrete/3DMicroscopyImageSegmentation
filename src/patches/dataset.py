@@ -4,10 +4,10 @@ import tifffile
 from tqdm import tqdm
 
 from src.config import (
+    ALLOWED_EXTENSIONS,
     MAX_WORKERS,
     PATCH_SIZE,
     PATCH_STEP,
-    allowed_extensions,
 )
 
 from .utils import (
@@ -46,7 +46,7 @@ class Dataset:
         self.image_mask_path_generator = (
             (image, masks_dir / image.name)
             for image in images_dir.glob("*")
-            if image.suffix.lower() in allowed_extensions
+            if image.suffix.lower() in ALLOWED_EXTENSIONS
             if validate_mask(image, masks_dir / image.name)
         )
 
