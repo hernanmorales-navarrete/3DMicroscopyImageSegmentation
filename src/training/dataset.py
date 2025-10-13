@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import tifffile
+
 from src.config import (
     BATCH_SIZE,
     INTENSITY_PARAMS,

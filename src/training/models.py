@@ -1,19 +1,19 @@
 from tensorflow.keras import Model
 from tensorflow.keras.layers import (
-    Conv3D,
-    ReLU,
-    MaxPool3D,
-    UpSampling3D,
-    Input,
-    Concatenate,
-    GroupNormalization,
-    Conv3DTranspose,
-    GlobalAveragePooling3D,
-    Dense,
-    Reshape,
     Activation,
-    Multiply,
     Add,
+    Concatenate,
+    Conv3D,
+    Conv3DTranspose,
+    Dense,
+    GlobalAveragePooling3D,
+    GroupNormalization,
+    Input,
+    MaxPool3D,
+    Multiply,
+    ReLU,
+    Reshape,
+    UpSampling3D,
 )
 
 
