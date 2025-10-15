@@ -1,11 +1,9 @@
-
-
-import datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
+from absl.logging import LOG_DIR
 from loguru import logger
-import models
 import tensorflow
 import typer
 
@@ -29,8 +27,8 @@ from src.config import (
     VALIDATION_SPLIT,
 )
 from src.training.dataset import ImageDataset
+import src.training.models as models_module
 from src.training.utils import (
-    AugmentationType,
     configure_gpu,
     create_callbacks,
     get_model_from_class,
@@ -39,18 +37,16 @@ from src.training.utils import (
 )
 
 configure_gpu()
-app = typer.Typer()
 
 def interface(
     model_name: Annotated[str, typer.Argument(help="Name of the model")], 
     data_dir: Annotated[str, typer.Argument(help="Directory containing the dataset")], 
     dataset_name: Annotated[str, typer.Argument(help="Name of the dataset for model organization")], 
-    augmentation: Annotated[str, typer.Option(AugmentationType.NONE, help="Type of augmentation to use. Available: NONE, STANDARD or OURS")],
-    psf_path: Annotated[Path, typer.Option(
-        None, 
+    augmentation: Annotated[str, typer.Argument(help="Type of augmentation to use. Available: NONE, STANDARD or OURS")],
+    psf_path: Annotated[Path, typer.Argument(
         help="Path to PSF file for microscopy augmentations"
     )], 
-    enable_reproducibility: Annotated[bool, typer.Option(True, help="Enable reproducibility")]
+    enable_reproducibility: Annotated[bool, typer.Option(help="Enable reproducibility")] = True
 ):
     #Enable reproducibility
     if enable_reproducibility: 
@@ -72,7 +68,7 @@ def interface(
         image_paths=train_image_paths,
         mask_paths=train_mask_paths,
         batch_size=BATCH_SIZE,
-        augmentation=augmentation.value,
+        augmentation=augmentation,
         intensity_params=INTENSITY_PARAMS,
     )
 
@@ -84,7 +80,7 @@ def interface(
     )
 
     logger.info(f"Creating {model_name}d model...")
-    model_class = get_model_from_class(model_name, models)
+    model_class = get_model_from_class(model_name, models_module)
     #Build model
     model = model_class().build_model()
 
@@ -98,15 +94,7 @@ def interface(
         metrics=METRICS
     )
 
-    #Create directories for logs and checkpoints with dataset and augmentation info. We save the directory as BC/UNet3D_NONE/timestamp
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    particular_model_directory_name = f"{dataset_name}/{model_name}_{augmentation.value}"
-    log_dir = LOGS_DIR / particular_model_directory_name / timestamp
-    checkpoint_dir = MODELS_DIR / particular_model_directory_name / timestamp
-    log_dir.mkdir(parents=True)
-    checkpoint_dir.mkdir(parents=True)
-
-    callbacks = create_callbacks(model_name, augmentation, dataset_name, log_dir, checkpoint_dir, TENSORBOARD_UPDATE_FREQ, CHECKPOINT_MONITOR, EARLY_STOPPING_MIN_DELTA, EARLY_STOPPING_PATIENCE, CHECKPOINT_MODE, SAVE_BEST_ONLY)
+    callbacks = create_callbacks(model_name, augmentation, dataset_name, LOGS_DIR, MODELS_DIR, TENSORBOARD_UPDATE_FREQ, CHECKPOINT_MONITOR, EARLY_STOPPING_MIN_DELTA, EARLY_STOPPING_PATIENCE, CHECKPOINT_MODE, SAVE_BEST_ONLY)
 
     logger.info("Starting training")
     model.fit(

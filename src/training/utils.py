@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from enum import Enum
 import inspect
 import os
@@ -11,12 +11,6 @@ from loguru import logger
 from sklearn.model_selection import train_test_split
 import tensorflow
 
-
-class AugmentationType(Enum):
-    "Enumeration class for augmentation options"
-    NONE = "NONE"
-    STANDARD = "STANDARD"
-    OURS = "OURS"
 
 def configure_gpu():
     """Configure GPU memory growth to avoid taking all memory.
@@ -85,12 +79,12 @@ def read_images_from_dir_and_create_dataset(data_dir: Path, allowed_extensions: 
 
     return train_image_paths, val_image_paths, train_mask_paths, val_mask_paths
 
-def create_callbacks(model_name: str, augmentation: AugmentationType, dataset_name: str, dir_to_save_logs: Path, dir_to_save_checkpoints: Path, tensorboard_update_freq: str, checkpoint_monitor: str, early_stopping_min_delta: int, early_stopping_patience: int, checkpoint_mode: str, save_best_only: bool):
+def create_callbacks(model_name: str, augmentation: str, dataset_name: str, dir_to_save_logs: Path, dir_to_save_checkpoints: Path, tensorboard_update_freq: str, checkpoint_monitor: str, early_stopping_min_delta: int, early_stopping_patience: int, checkpoint_mode: str, save_best_only: bool):
     callbacks = []
 
     # Create directories for logs and checkpoints with dataset and augmentation info
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    model_dir_name = f"{dataset_name}/{model_name}_{augmentation.value}"
+    model_dir_name = f"{dataset_name}/{model_name}_{augmentation}"
 
     log_dir = dir_to_save_logs / model_dir_name / timestamp
     checkpoint_dir = dir_to_save_checkpoints / model_dir_name / timestamp
