@@ -6,7 +6,7 @@ from src.config import (
     BATCH_SIZE,
     INTENSITY_PARAMS,
 )
-from src.processors.augmentation_processor import Augmentor
+from src.training.augmentation import Augmentor
 
 
 class ImageDataset(tf.keras.utils.PyDataset):

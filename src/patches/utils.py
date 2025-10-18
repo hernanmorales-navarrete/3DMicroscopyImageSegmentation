@@ -1,6 +1,5 @@
 import concurrent.futures
 from pathlib import Path
-from shutil import rmtree
 from typing import Annotated, Any, Tuple
 
 from loguru import logger
@@ -8,14 +7,6 @@ import numpy
 from numpy.typing import NDArray
 from patchify import patchify
 import tifffile
-
-
-def overwrite_and_create_directory(dir_path: Path) -> None:
-    try:
-        dir_path.mkdir(parents=True)
-    except FileExistsError:
-        logger.info(f"Existing directory {dir_path}. Deleting it.")
-        rmtree(dir_path)
 
 
 def validate_mask(image_path: Path, mask_path: Path) -> bool:

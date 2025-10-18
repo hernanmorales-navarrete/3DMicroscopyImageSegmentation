@@ -19,34 +19,6 @@ class Evaluator:
         self.metrics = Metrics()
         self.predictor = Predictor()
 
-    def extract_patch_info(self, filename: Path) -> Tuple[str, tuple, tuple, tuple]:
-        """Extract information from patch filename.
-
-        Args:
-            filename: Patch filename (e.g. 'image1_orig_512_512_128_pad_520_520_130_npatches_4_8_8_patch_0000.tif')
-
-        Returns:
-            tuple: (image_name, original_shape, padded_shape, n_patches)
-        """
-        pattern = r"(.+)_orig_(\d+)_(\d+)_(\d+)(?:_pad_(\d+)_(\d+)_(\d+))?_npatches_(\d+)_(\d+)_(\d+)_patch_\d+\.tif"
-        match = re.match(pattern, filename.name)
-
-        if not match:
-            raise ValueError(f"Invalid patch filename format: {filename}")
-
-        image_name = match.group(1)
-        orig_shape = (int(match.group(2)), int(match.group(3)), int(match.group(4)))
-
-        # Get padded shape if it exists, otherwise use original shape
-        if match.group(5):
-            padded_shape = (int(match.group(5)), int(match.group(6)), int(match.group(7)))
-            n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
-        else:
-            padded_shape = orig_shape
-            n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
-
-        return image_name, orig_shape, padded_shape, n_patches
-
     def reconstruct_complete_image(
         self,
         patch_predictions: List[np.ndarray],

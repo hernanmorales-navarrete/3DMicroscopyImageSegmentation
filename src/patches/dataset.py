@@ -11,13 +11,21 @@ from src.config import (
 )
 
 from .utils import (
-    create_and_save_patches_from_image_and_mask,
     overwrite_and_create_directory,
     validate_mask,
 )
 
+from src.utils import(
+    overwrite_and_create_directory
+)
+
 
 class Dataset:
+    """
+    Given a datset_folder, an output_folder and whether or not it is for reconstruction to add padding, it returns a new dataset that consists of volumnes.
+
+    Therefore, ALL THE FUNCTIONS FOR INFERENCE, TRAINING ARE BASED ON 3D IMAGES. 
+    """
     def __init__(
         self, dataset_folder: Path, for_reconstruction: bool, output_dir: Path = "patches"
     ) -> None:

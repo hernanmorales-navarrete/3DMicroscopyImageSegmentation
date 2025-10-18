@@ -1,13 +1,13 @@
-import numpy as np
-import tifffile as tiff
-from scipy.signal import fftconvolve
-from scipy.ndimage import convolve, zoom
+from typing import Any, Dict, List
+
 import albumentations as A
-from typing import List, Dict, Any
-from .base import ImageProcessor
+import numpy as np
+from scipy.ndimage import convolve, zoom
+from scipy.signal import fftconvolve
+import tifffile as tiff
 
 
-class Augmentor(ImageProcessor):
+class Augmentor():
     """Class for handling image augmentations."""
 
     def __init__(self, intensity_params: Dict[str, Any]):
