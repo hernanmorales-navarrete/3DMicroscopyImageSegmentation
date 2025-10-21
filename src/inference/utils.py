@@ -1,12 +1,14 @@
+from dataclasses import dataclass
 import itertools
 from pathlib import Path
 import re
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 
 import cv2
 from loguru import logger
 from numpy.ctypeslib import as_array
 from numpy.typing import NDArray
+from patchify import unpatchify
 from skimage.filters import frangi
 import tensorflow
 import tifffile
@@ -16,22 +18,28 @@ import concurrent.futures
 from src.config import AVAILABLE_MODELS
 from src.utils import overwrite_and_create_directory
 
+@dataclass
+class ImageMetadata:
+    "Information necessary to reconstruct an image from patches" 
+    image_name: str
+    original_shape: Tuple[int, int, int]
+    padded_shape: Tuple[int, int, int] | None
+    number_of_patches: int
+    patch_id: int
 
-def extract_patch_info(filename):
-    """Extract information from patch filename.
+
+def extract_patch_info_from_path(path: Path) -> ImageMetadata:
+    """Extract information from patch path.
 
     Args:
-        filename: Patch filename (e.g. 'image1_orig_512_512_128_pad_520_520_130_npatches_4_8_8_patch_0000.tif')
-
-    Returns:
-        tuple: (image_name, original_shape, padded_shape, n_patches)
+        filename: Patch filename (e.g. '.../image1_orig_512_512_128_pad_520_520_130_npatches_4_8_8_patch_0000.tif')
     """
     # Extract information using regex
     pattern = r"(.+)_orig_(\d+)_(\d+)_(\d+)(?:_pad_(\d+)_(\d+)_(\d+))?_npatches_(\d+)_(\d+)_(\d+)_patch_(\d+)\.tiff?"
-    match = re.match(pattern, filename.name)
+    match = re.match(pattern, path.name)
 
     if not match:
-        raise ValueError(f"Invalid patch filename format: {filename}")
+        raise ValueError(f"Invalid patch filename format: {path}")
 
     image_name = match.group(1)
     orig_shape = (int(match.group(2)), int(match.group(3)), int(match.group(4)))
@@ -39,14 +47,14 @@ def extract_patch_info(filename):
     # Get padded shape if it exists, otherwise use original shape
     if match.group(5):
         padded_shape = (int(match.group(5)), int(match.group(6)), int(match.group(7)))
-        n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
     else:
-        padded_shape = orig_shape
-        n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
+        padded_shape = None
+    
+    n_patches = (int(match.group(8)), int(match.group(9)), int(match.group(10)))
     
     patch_id = int(match.group(11))
 
-    return image_name, orig_shape, padded_shape, n_patches, patch_id
+    return ImageMetadata(image_name, orig_shape, padded_shape, n_patches, patch_id)
 
 def normalize_image_to_0_1(image: NDArray): 
     return (image - image.min()) / (image.max() - image.min() + np.finfo(float).eps)
@@ -84,19 +92,19 @@ def save_mask_in_disk(mask: NDArray, output_dir: Path):
     except Exception as e: 
         raise Exception(f"The mask {output_dir} couldn't be saved: {e}")
 
-def apply_classical_thresholding_and_save_masks_for_array_of_filenames(array_of_patch_or_images_filenames: List[Path], output_dir: Path, method: str, max_workers: int):
-    save_dir = output_dir / method
+def apply_classical_thresholding_and_save_masks_for_array_of_filenames(array_of_patch_or_images_filenames: List[Path], save_dir_for_patches: Path, method: str, max_workers: int):
+    save_dir = save_dir_for_patches / method
     overwrite_and_create_directory(save_dir)
 
     #Create a single function to apply a thresholding method and save mask in order to execute it in a multiprocessing environment
-    def apply_and_save_mask(image_path: Path):
+    def apply_method_and_save_mask(image_path: Path):
         image = tifffile.imread(str(image_path)) 
         mask = apply_classical_thresholding_method_to_image(image, method)
         # Save in save_dir with the same name and extension
         save_mask_in_disk(mask, save_dir / image_path.stem)
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor: 
-        futures = [executor.submit(apply_and_save_mask, image_path) for image_path in array_of_patch_or_images_filenames]
+        futures = [executor.submit(apply_method_and_save_mask, image_path) for image_path in array_of_patch_or_images_filenames]
         for future in concurrent.futures.as_completed(futures): 
             try: 
                 future.result()
@@ -200,15 +208,33 @@ def batch_iterable(iterable, n):
         yield batch
 
 
-def apply_deep_learning_method_to_array_of_filenames(array_of_patch_filenames: list[Path], save_dir_for_patches_predictions: Path, save_dir_for_complete_images_preditions: Path ,model_name: str, model_augmentation: str, model_path: Path, batch_size: int):
+def reconstruct_image_from_patches_and_metadata(patches: list[NDArray], metadata: ImageMetadata, patch_size: int):
+    if metadata.padded_shape is None: 
+        raise Exception("Image can't be reconstructed from regular patches, use reconstruction patches instead")
+
+    #Reshape patches to (z_patches, y_patches, x_patches)
+    patches_reshaped = patches.reshape(*metadata.number_of_patches, patch_size)
+
+    # Image is padded, so you have to reconstruct it with the padded_shape
+    reconstructed_image = unpatchify(patches_reshaped, metadata.padded_shape)
+
+    #Cut the padding with the original size of the image
+    reconstructed_image = reconstructed_image[tuple(slice(0, s) for s in metadata.original_shape)]
+
+    return reconstructed_image
+
+def apply_deep_learning_method_to_array_of_filenames(array_of_patch_complete_paths: list[Path], save_dir_for_patches_predictions: Path, save_dir_for_complete_images_preditions: Path ,model_name: str, model_augmentation: str, model_path: Path, batch_size: int, patch_size: int, max_workers: int):
     #Load model
     model = tensorflow.keras.models.load_model(model_path)
 
-    #Create an array of predictions to reconstruct whole image
+    #Create an array of predictions
     predictions = []
 
+    #Get metadata from the first patch
+    metadata = extract_patch_info_from_path(array_of_patch_complete_paths[0])
+
     #Create batches of filenames
-    for batch_of_filenames in batch_iterable(array_of_patch_filenames, batch_size):
+    for batch_of_filenames in batch_iterable(array_of_patch_complete_paths, batch_size):
         #Create batches of patches
         batch_of_patches = map(tifffile.imread, batch_of_filenames)
 
@@ -218,5 +244,22 @@ def apply_deep_learning_method_to_array_of_filenames(array_of_patch_filenames: l
         #Add prediction of batch to predictions
         predictions.extend(prediction_of_batch)
     
-    #With the array of predictions and array of patch filenames, we can store the patches, or 
+    #Use multiprogressing to save the patches
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for path, prediction in zip(array_of_patch_complete_paths, predictions):
+            #Save the patches in the same format as the patches savings, example:
+            # OUTPUT_DIR/UNET3D_OURS/*.TIFF
+            output_filename = save_dir_for_patches_predictions / f"{model_name}_{model_augmentation}" / path.name
+        futures = [executor.submit(save_mask_in_disk, prediction, output_filename)]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+    
+    #Use patches to reconstruct a single image and save it
+    output_filename = save_dir_for_complete_images_preditions / f"{model_name}_{model_augmentation}" / metadata.image_name
+
+    output_image = reconstruct_image_from_patches_and_metadata(predictions, metadata, patch_size) 
+
+    save_mask_in_disk(output_image, output_filename)
+
 

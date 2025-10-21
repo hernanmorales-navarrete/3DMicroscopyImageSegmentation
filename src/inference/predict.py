@@ -6,13 +6,13 @@ import tifffile
 from src.config import ALLOWED_EXTENSIONS, CLASSICAL_METHODS, MAX_WORKERS
 from src.inference.utils import apply_classical_thresholding_and_save_masks_for_array_of_filenames, extract_patch_info
 from src.utils import create_directory
+from loguru import logger
 
 
 class Prediction:
     """
-    This class performs predictions at a patch-level and image level. 
-    patch-level: each patch's prediction is processed
-    image-level: each patch's prediction is reconstructed and saved 
+    This class performs predictions for classical models and deep learning models: 
+    1. For classical models, we take an array of patches
 
     The task's result is a mask. 
 
@@ -51,13 +51,15 @@ class Prediction:
         for subdir in self.subdirs_corresponding_to_image_names:
             # Obtain image's patches filenames and sort them by ID
             # IMPORTANT: THE IMAGES SHOULD BE SORTED! 
-            image_patches_filenames = sorted(subdir.glob("*"), key=lambda filename: extract_patch_info(filename)[4])
+            image_patches_absolute_paths = sorted(subdir.glob("*"), key=lambda filename: extract_patch_info(filename)[4])
 
             #Predict patches with classical thresholding methods
+            logger.info("Applying classical thresholding and saving masks")
             for method in CLASSICAL_METHODS: 
-                apply_classical_thresholding_and_save_masks_for_array_of_filenames(image_patches_filenames, self.directory_for_patch_level_predictions, method, MAX_WORKERS)
+                apply_classical_thresholding_and_save_masks_for_array_of_filenames(image_patches_absolute_paths, self.directory_for_patch_level_predictions, method, MAX_WORKERS)
             
             #Predict complete images (image-level) with classical thresholding methods
+            
         
             #Predict patches with deep learning methods. This includes image-level and patch-level predictions; remember, we reconstruct predictions for patches in order to build the whole image
     
