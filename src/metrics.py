@@ -1,8 +1,7 @@
-import numpy as np
-from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score, accuracy_score
 import cv2
+import numpy as np
 from skimage.filters import frangi
-from loguru import logger
+from sklearn.metrics import accuracy_score, f1_score, jaccard_score, precision_score, recall_score
 
 
 def compute_metrics(y_true, y_pred):

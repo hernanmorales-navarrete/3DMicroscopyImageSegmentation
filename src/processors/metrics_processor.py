@@ -1,6 +1,8 @@
-from typing import Dict, Any
+from typing import Dict
+
 import numpy as np
-from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score, accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, jaccard_score, precision_score, recall_score
+
 from .base import ImageProcessor
 
 

@@ -1,7 +1,8 @@
+from pathlib import Path
+from typing import Union
+
 import numpy as np
 import tifffile as tiff
-from typing import Union, Tuple, Dict, Any
-from pathlib import Path
 
 
 class ImageProcessor:

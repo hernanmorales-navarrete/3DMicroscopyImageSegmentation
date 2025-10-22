@@ -1,8 +1,9 @@
 from pathlib import Path
-import typer
-from loguru import logger
 
-from src.config import FIGURES_DIR, MODELS_DIR, METHOD_ORDER
+from loguru import logger
+import typer
+
+from src.config import FIGURES_DIR, METHOD_ORDER, MODELS_DIR
 from src.processors import Predictor, Visualizer
 from src.processors.evaluator import Evaluator
 from src.utils import configure_gpu

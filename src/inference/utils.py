@@ -1,22 +1,21 @@
+import concurrent.futures
 from dataclasses import dataclass
 import itertools
 from pathlib import Path
 import re
-from typing import Iterable, List, Tuple
+from typing import List, Tuple
 
 import cv2
 from loguru import logger
-from numpy.ctypeslib import as_array
+import numpy as np
 from numpy.typing import NDArray
 from patchify import unpatchify
 from skimage.filters import frangi
 import tensorflow
 import tifffile
-import numpy as np
-import concurrent.futures
 
-from src.config import AVAILABLE_MODELS
 from src.utils import overwrite_and_create_directory
+
 
 @dataclass
 class ImageMetadata:
@@ -123,7 +122,7 @@ def extract_information_from_model_dir_path(model_path: Path):
     #Return model name and augmentation
     return parts[0], parts[1]
 
-def load_deep_learning_models_from_dir(models_dir: Path, dataset_name: str, available_models: List[str]):
+def get_deep_learning_models_from_dir(models_dir: Path, dataset_name: str, available_models: List[str]):
     """
     The format of a models directory must be
     

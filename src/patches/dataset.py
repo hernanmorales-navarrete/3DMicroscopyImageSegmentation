@@ -9,14 +9,11 @@ from src.config import (
     PATCH_SIZE,
     PATCH_STEP,
 )
+from src.utils import overwrite_and_create_directory
 
 from .utils import (
-    overwrite_and_create_directory,
+    create_and_save_patches_from_image_and_mask,
     validate_mask,
-)
-
-from src.utils import(
-    overwrite_and_create_directory
 )
 
 
@@ -73,8 +70,8 @@ class Dataset:
                     )
 
                 # Create output directories to store the patches of a single image and its corresponding mask
-                dir_to_store_patches_for_single_image = self.patches_images_dir / image_path.stem
-                dir_to_store_patches_for_single_mask = self.patches_masks_dir / image_path.stem
+                dir_to_store_patches_for_single_image = self.patches_images_dir / image_path.name
+                dir_to_store_patches_for_single_mask = self.patches_masks_dir / image_path.name
 
                 overwrite_and_create_directory(dir_to_store_patches_for_single_image)
                 overwrite_and_create_directory(dir_to_store_patches_for_single_mask)

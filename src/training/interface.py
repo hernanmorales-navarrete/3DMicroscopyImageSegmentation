@@ -1,8 +1,6 @@
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
-from absl.logging import LOG_DIR
 from loguru import logger
 import tensorflow
 import typer
