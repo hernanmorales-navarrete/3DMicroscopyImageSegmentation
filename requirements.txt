@@ -11,3 +11,4 @@ albumentations
 pandas
 seaborn
 notebook
+tqdm
