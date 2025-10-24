@@ -56,6 +56,7 @@ INTENSITY_PARAMS = {
 # Training Configuration
 RANDOM_SEED = 42
 AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
+AVAILABLE_AUGMENTATIONS = ["NONE", "STANDARD", "OURS"]
 
 # Training hyperparameters
 LEARNING_RATE = 1e-5

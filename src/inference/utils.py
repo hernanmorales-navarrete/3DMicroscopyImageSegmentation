@@ -14,7 +14,7 @@ from skimage.filters import frangi
 import tensorflow
 import tifffile
 
-from src.utils import overwrite_and_create_directory
+from src.utils import create_directory
 
 
 @dataclass
@@ -64,7 +64,7 @@ def normalize_image_to_0_255(image: NDArray) -> NDArray[np.uint8]:
 def apply_threshold_to_image_and_convert_to_dtype(image: NDArray, threshold: int, dtype):
     return (image > threshold).astype(dtype)
 
-def apply_classical_thresholding_method_to_image(image: NDArray, method: str):
+def apply_classical_thresholding_method_to_2D_image(image: NDArray, method: str):
     normalized_image = normalize_image_to_0_255(image)
 
     if method == 'otsu': 
@@ -77,13 +77,19 @@ def apply_classical_thresholding_method_to_image(image: NDArray, method: str):
         frangi_result = frangi(normalized_image)
 
         #Apply threshold to frangi result
-        _, mask = cv2.threshold(normalize_image_to_0_255(frangi_result), cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, mask = cv2.threshold(normalize_image_to_0_255(frangi_result), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     else: 
         raise ValueError(f"Thresholding method {method} not implemented")
     
     #Ensure that mask is of 1 and 0's, and that it is of type np.uint8
     return apply_threshold_to_image_and_convert_to_dtype(mask, 0, np.uint8)
 
+def apply_classical_thresholding_method_to_3D_image(image: NDArray, method: str):
+    #Apply classical thresholding to each slice in the z axis
+    masks_from_slices = [apply_classical_thresholding_method_to_2D_image(image[z], method) for z in range(image.shape[0])]
+
+    #Merge masks into a sole volume
+    return np.stack(masks_from_slices, axis=0)
 
 def save_mask_in_disk(mask: NDArray, output_dir: Path): 
     try: 
@@ -91,19 +97,19 @@ def save_mask_in_disk(mask: NDArray, output_dir: Path):
     except Exception as e: 
         raise Exception(f"The mask {output_dir} couldn't be saved: {e}")
 
-def apply_classical_thresholding_and_save_masks_for_array_of_filenames(array_of_patch_or_images_filenames: List[Path], save_dir_for_patches: Path, method: str, max_workers: int):
-    save_dir = save_dir_for_patches / method
-    overwrite_and_create_directory(save_dir)
+#Create a single function to apply a thresholding method and save mask in order to execute it in a multiprocessing environment
+def apply_method_and_save_mask(image_path: Path, method: str, save_dir: Path):
+    image = tifffile.imread(str(image_path)) 
+    mask = apply_classical_thresholding_method_to_3D_image(image, method)
+    # Save in save_dir with the same name and extension
+    save_mask_in_disk(mask, save_dir / image_path.name)
 
-    #Create a single function to apply a thresholding method and save mask in order to execute it in a multiprocessing environment
-    def apply_method_and_save_mask(image_path: Path):
-        image = tifffile.imread(str(image_path)) 
-        mask = apply_classical_thresholding_method_to_image(image, method)
-        # Save in save_dir with the same name and extension
-        save_mask_in_disk(mask, save_dir / image_path.stem)
+def apply_classical_thresholding_and_save_masks_for_array_of_filenames(array_of_patch_or_images_filenames: List[Path], save_dir_for_patches: Path, name_of_image: str, method: str, max_workers: int):
+    save_dir = save_dir_for_patches / method / name_of_image
+    create_directory(save_dir)
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor: 
-        futures = [executor.submit(apply_method_and_save_mask, image_path) for image_path in array_of_patch_or_images_filenames]
+        futures = [executor.submit(apply_method_and_save_mask, image_path, method, save_dir) for image_path in array_of_patch_or_images_filenames]
         for future in concurrent.futures.as_completed(futures): 
             try: 
                 future.result()
@@ -122,7 +128,7 @@ def extract_information_from_model_dir_path(model_path: Path):
     #Return model name and augmentation
     return parts[0], parts[1]
 
-def get_deep_learning_models_from_dir(models_dir: Path, dataset_name: str, available_models: List[str]):
+def get_deep_learning_models_from_dir(models_dir: Path, available_models: List[str], available_augmentations: List[str]):
     """
     The format of a models directory must be
     
@@ -133,26 +139,26 @@ def get_deep_learning_models_from_dir(models_dir: Path, dataset_name: str, avail
             TIMESTAMP2
             |   best_model.h5
             TIMESTAMP3
-        MODEL2
+        MODEL2_AUGMENTATION ("AttentionUNet3D_STANDARD")
 
     This function assumes that there is one and only one best model per timestamp (called best_model.h5)
 
     It creates a dictionary mapping (model_name_augmentation_type) -> (path_to_model, augmentation_type)
     (UNet3D_OURS) -> (path_to_model, OURS)
     """
-    dataset_models_dir = models_dir / dataset_name
 
-    if not dataset_models_dir.exists(): 
-        raise Exception(f"Dataset directory doesn't exist: {dataset_models_dir}")
+    if not models_dir.exists(): 
+        raise Exception(f"Models directory doesn't exist: {models_dir}")
     
-    if any(dir.name not in available_models for dir in dataset_models_dir.glob("*/")): 
-        raise Exception("Dataset directory contains an invalid model name")
+    if any((dir.stem).split("_")[0] not in available_models for dir in models_dir.glob("*")): 
+        raise Exception("Models' directory contains an invalid model")
+
+    if any((dir.stem).split("_")[1] not in available_augmentations for dir in models_dir.glob("*")): 
+        raise Exception("Models' directory contains an invalid augmentation")
 
     models_list = []
     
-    for model in available_models:
-        model_dir = dataset_models_dir / model
-
+    for model_dir in models_dir.glob("*/"):
         model_name, model_augmentation = extract_information_from_model_dir_path(model_dir)
 
         #Get timestamp directories within model_dir\
@@ -162,12 +168,14 @@ def get_deep_learning_models_from_dir(models_dir: Path, dataset_name: str, avail
             raise Exception(f"No timestamp directories in {model_dir}")
 
         #Get most recent timestamp directory
-        latest_timestamp_model = sorted(timestamps, lambda dir: dir.name)[-1]
+        latest_timestamp_model = sorted(timestamps, key=lambda dir: dir.name)[-1]
 
         #Get model files and check there's at least one .h5 model
         model_files = latest_timestamp_model.glob("*.h5")
         if not model_files: 
             raise Exception(f"No .h5 model files in {latest_timestamp_model}")
+        
+        logger.info(f"Found {model_name}_{model_augmentation} in {model_files}")
         
         best_model_path = next(model_files, None)
 
@@ -207,12 +215,12 @@ def batch_iterable(iterable, n):
         yield batch
 
 
-def reconstruct_image_from_patches_and_metadata(patches: list[NDArray], metadata: ImageMetadata, patch_size: int):
+def reconstruct_image_from_patches_and_metadata(patches: list[NDArray], metadata: ImageMetadata, patch_size: tuple[int, int, int]):
     if metadata.padded_shape is None: 
         raise Exception("Image can't be reconstructed from regular patches, use reconstruction patches instead")
 
-    #Reshape patches to (z_patches, y_patches, x_patches)
-    patches_reshaped = patches.reshape(*metadata.number_of_patches, patch_size)
+    #Convert list of patches to np array and reshape patches to (z_patches, y_patches, x_patches, patch_size_z, patch_size_y, patch_size_x)
+    patches_reshaped = np.array(patches).reshape(*metadata.number_of_patches, *patch_size)
 
     # Image is padded, so you have to reconstruct it with the padded_shape
     reconstructed_image = unpatchify(patches_reshaped, metadata.padded_shape)
@@ -222,7 +230,11 @@ def reconstruct_image_from_patches_and_metadata(patches: list[NDArray], metadata
 
     return reconstructed_image
 
-def apply_deep_learning_method_to_array_of_filenames(array_of_patch_complete_paths: list[Path], save_dir_for_patches_predictions: Path, save_dir_for_complete_images_preditions: Path ,model_name: str, model_augmentation: str, model_path: Path, batch_size: int, patch_size: int, max_workers: int):
+def apply_deep_learning_method_to_array_of_filenames(array_of_patch_complete_paths: list[Path], save_dir_for_patches_predictions: Path, save_dir_for_complete_images_preditions: Path, name_of_image: str, model_name: str, model_augmentation: str, model_path: Path, batch_size: int, patch_size: tuple[int, int, int], max_workers: int):
+    #Create folder to save predictions for a defined model
+    create_directory(save_dir_for_patches_predictions / f"{model_name}_{model_augmentation}" / name_of_image)
+    create_directory(save_dir_for_complete_images_preditions / f"{model_name}_{model_augmentation}" / name_of_image)
+
     #Load model
     model = tensorflow.keras.models.load_model(model_path)
 
@@ -245,18 +257,13 @@ def apply_deep_learning_method_to_array_of_filenames(array_of_patch_complete_pat
     
     #Use multiprogressing to save the patches
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = []
-        for path, prediction in zip(array_of_patch_complete_paths, predictions):
-            #Save the patches in the same format as the patches savings, example:
-            # OUTPUT_DIR/UNET3D_OURS/*.TIFF
-            output_filename = save_dir_for_patches_predictions / f"{model_name}_{model_augmentation}" / path.name
-        futures = [executor.submit(save_mask_in_disk, prediction, output_filename)]
+        futures = [executor.submit(save_mask_in_disk, prediction, save_dir_for_patches_predictions / f"{model_name}_{model_augmentation}" /name_of_image / path.name) for path, prediction in zip(array_of_patch_complete_paths, predictions)]
+
         for future in concurrent.futures.as_completed(futures):
             future.result()
     
     #Use patches to reconstruct a single image and save it
-    output_filename = save_dir_for_complete_images_preditions / f"{model_name}_{model_augmentation}" / metadata.image_name
-
+    output_filename = save_dir_for_complete_images_preditions / f"{model_name}_{model_augmentation}" / name_of_image / name_of_image
     output_image = reconstruct_image_from_patches_and_metadata(predictions, metadata, patch_size) 
 
     save_mask_in_disk(output_image, output_filename)
