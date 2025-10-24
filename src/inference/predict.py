@@ -17,7 +17,7 @@ from src.inference.utils import (
     extract_patch_info_from_path,
     get_deep_learning_models_from_dir,
 )
-from src.utils import create_directory, overwrite_and_create_directory
+from src.utils import overwrite_and_create_directory
 
 
 class Prediction:
