@@ -21,8 +21,9 @@ class Dataset:
     """
     Given a datset_folder, an output_folder and whether or not it is for reconstruction to add padding, it returns a new dataset that consists of volumnes.
 
-    Therefore, ALL THE FUNCTIONS FOR INFERENCE, TRAINING ARE BASED ON 3D IMAGES. 
+    Therefore, ALL THE FUNCTIONS FOR INFERENCE, TRAINING ARE BASED ON 3D IMAGES.
     """
+
     def __init__(
         self, dataset_folder: Path, for_reconstruction: bool, output_dir: Path = "patches"
     ) -> None:

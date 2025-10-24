@@ -30,17 +30,20 @@ def configure_gpu():
     else:
         logger.warning("No GPUs found. Running on CPU only.")
 
+
 def set_random_seed(seed: int):
     keras.utils.set_random_seed(seed)
     tensorflow.config.experimental.enable_op_determinism()
 
-def get_available_models(module: types.ModuleType): 
+
+def get_available_models(module: types.ModuleType):
     "Get models from a module. A model should be a class and have the method attribute build_model"
     model_classes = {}
     for name, obj in inspect.getmembers(module):
         if inspect.isclass(obj) and hasattr(obj, "build_model"):
             model_classes[name] = obj
     return model_classes
+
 
 def get_model_from_class(model_name: str, module: types.ModuleType):
     "Get a model class from a module"
@@ -50,12 +53,18 @@ def get_model_from_class(model_name: str, module: types.ModuleType):
         raise ValueError(f"Model {model_name} not found. Available models: {available_models}")
     return model_classes[model_name]
 
-def read_images_from_dir_and_create_dataset(data_dir: Path, allowed_extensions: Tuple[str, str], validation_split: int, random_state: int = None):
+
+def read_images_from_dir_and_create_dataset(
+    data_dir: Path,
+    allowed_extensions: Tuple[str, str],
+    validation_split: int,
+    random_state: int = None,
+):
     image_paths = []
     mask_paths = []
 
-    #Get all file paths from allowed extensions
-    for ext in allowed_extensions: 
+    # Get all file paths from allowed extensions
+    for ext in allowed_extensions:
         image_paths.extend(tensorflow.io.gfile.glob(os.path.join(data_dir, f"images/**/*{ext}")))
         mask_paths.extend(tensorflow.io.gfile.glob(os.path.join(data_dir, f"images/**/*{ext}")))
 
@@ -78,7 +87,20 @@ def read_images_from_dir_and_create_dataset(data_dir: Path, allowed_extensions: 
 
     return train_image_paths, val_image_paths, train_mask_paths, val_mask_paths
 
-def create_callbacks(model_name: str, augmentation: str, dataset_name: str, dir_to_save_logs: Path, dir_to_save_checkpoints: Path, tensorboard_update_freq: str, checkpoint_monitor: str, early_stopping_min_delta: int, early_stopping_patience: int, checkpoint_mode: str, save_best_only: bool):
+
+def create_callbacks(
+    model_name: str,
+    augmentation: str,
+    dataset_name: str,
+    dir_to_save_logs: Path,
+    dir_to_save_checkpoints: Path,
+    tensorboard_update_freq: str,
+    checkpoint_monitor: str,
+    early_stopping_min_delta: int,
+    early_stopping_patience: int,
+    checkpoint_mode: str,
+    save_best_only: bool,
+):
     callbacks = []
 
     # Create directories for logs and checkpoints with dataset and augmentation info

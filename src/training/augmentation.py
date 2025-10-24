@@ -7,7 +7,7 @@ from scipy.signal import fftconvolve
 import tifffile as tiff
 
 
-class Augmentor():
+class Augmentor:
     """Class for handling image augmentations."""
 
     def __init__(self, intensity_params: Dict[str, Any]):

@@ -11,8 +11,9 @@ def overwrite_and_create_directory(dir_path: Path) -> None:
         logger.info(f"Existing directory {dir_path}. Deleting it.")
         rmtree(dir_path)
 
-def create_directory(dir_path: Path) -> None: 
-    try: 
+
+def create_directory(dir_path: Path) -> None:
+    try:
         dir_path.mkdir(parents=True, exist_ok=True)
-    except FileExistsError: 
+    except FileExistsError:
         logger.info(f"Found directory {dir_path}")

@@ -27,10 +27,10 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 # VARIABLES
 
 PATCH_SIZE = (64, 64, 64)
-PATCH_STEP = 64  
+PATCH_STEP = 64
 
-MAX_WORKERS = 16 # Number of cores used in multiprocessing tasks
-THRESHOLD = 0.5 #Thresholding for 
+MAX_WORKERS = 16  # Number of cores used in multiprocessing tasks
+THRESHOLD = 0.5  # Thresholding for
 
 # Intensity augmentation parameters
 INTENSITY_PARAMS = {
@@ -84,13 +84,8 @@ METRICS = ["accuracy"]
 TENSORBOARD_UPDATE_FREQ = "epoch"
 PROFILE_BATCH = 0  # Disable profiling
 
-#Available classical methods
-CLASSICAL_METHODS = [
-    "otsu",
-    "adaptive_gaussian", 
-    "adaptive_mean", 
-    "frangi"
-]
+# Available classical methods
+CLASSICAL_METHODS = ["otsu", "adaptive_gaussian", "adaptive_mean", "frangi"]
 
 # Visualization settings
 METHOD_ORDER = [
