@@ -209,7 +209,7 @@ def get_deep_learning_models_from_dir(
         if not model_files:
             raise Exception(f"No .h5 model files in {latest_timestamp_model}")
 
-        logger.info(f"Found {model_name}_{model_augmentation} in {model_files}")
+        logger.info(f"Found {model_name}_{model_augmentation} in {model_files.name}")
 
         best_model_path = next(model_files, None)
 
