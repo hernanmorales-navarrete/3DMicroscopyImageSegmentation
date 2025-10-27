@@ -5,9 +5,9 @@ from loguru import logger
 from src.config import (
     ALLOWED_EXTENSIONS,
     AVAILABLE_AUGMENTATIONS,
+    AVAILABLE_CLASSICAL_METHODS,
     AVAILABLE_MODELS,
     BATCH_SIZE,
-    CLASSICAL_METHODS,
     MAX_WORKERS,
     PATCH_SIZE,
 )
@@ -91,18 +91,16 @@ class Prediction:
             logger.info(
                 "Applying classical thresholding for patches and complete images and saving masks"
             )
-            for method in CLASSICAL_METHODS:
+            for method in AVAILABLE_CLASSICAL_METHODS:
                 apply_classical_thresholding_and_save_masks_for_array_of_filenames(
                     image_patches_absolute_paths,
                     self.directory_for_patch_level_predictions,
-                    subdir.name,
                     method,
                     MAX_WORKERS,
                 )
                 apply_classical_thresholding_and_save_masks_for_array_of_filenames(
                     [complete_image_filename],
                     self.directory_for_image_level_predictions,
-                    subdir.name,
                     method,
                     MAX_WORKERS,
                 )
@@ -116,7 +114,6 @@ class Prediction:
                     image_patches_absolute_paths,
                     self.directory_for_patch_level_predictions,
                     self.directory_for_image_level_predictions,
-                    subdir.name,
                     model_name,
                     augmentation,
                     best_model_path,

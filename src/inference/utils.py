@@ -125,11 +125,10 @@ def apply_method_and_save_mask(image_path: Path, method: str, save_dir: Path):
 def apply_classical_thresholding_and_save_masks_for_array_of_filenames(
     array_of_patch_or_images_filenames: List[Path],
     save_dir_for_patches: Path,
-    name_of_image: str,
     method: str,
     max_workers: int,
 ):
-    save_dir = save_dir_for_patches / method / name_of_image
+    save_dir = save_dir_for_patches / method
     create_directory(save_dir)
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
@@ -277,7 +276,6 @@ def apply_deep_learning_method_to_array_of_filenames(
     array_of_patch_complete_paths: list[Path],
     save_dir_for_patches_predictions: Path,
     save_dir_for_complete_images_preditions: Path,
-    name_of_image: str,
     model_name: str,
     model_augmentation: str,
     model_path: Path,
@@ -286,13 +284,9 @@ def apply_deep_learning_method_to_array_of_filenames(
     max_workers: int,
 ):
     # Create folder to save predictions for a defined model
+    create_directory(save_dir_for_patches_predictions / f"{model_name}_{model_augmentation}")
     create_directory(
-        save_dir_for_patches_predictions / f"{model_name}_{model_augmentation}" / name_of_image
-    )
-    create_directory(
-        save_dir_for_complete_images_preditions
-        / f"{model_name}_{model_augmentation}"
-        / name_of_image
+        save_dir_for_complete_images_preditions / f"{model_name}_{model_augmentation}"
     )
 
     # Load model
@@ -323,7 +317,6 @@ def apply_deep_learning_method_to_array_of_filenames(
                 prediction,
                 save_dir_for_patches_predictions
                 / f"{model_name}_{model_augmentation}"
-                / name_of_image
                 / path.name,
             )
             for path, prediction in zip(array_of_patch_complete_paths, predictions)
@@ -336,9 +329,10 @@ def apply_deep_learning_method_to_array_of_filenames(
     output_filename = (
         save_dir_for_complete_images_preditions
         / f"{model_name}_{model_augmentation}"
-        / name_of_image
-        / name_of_image
+        / (metadata.image_name + ".tif")
     )
-    output_image = reconstruct_image_from_patches_and_metadata(predictions, metadata, patch_size)
+    reconstructed_image = reconstruct_image_from_patches_and_metadata(
+        predictions, metadata, patch_size
+    )
 
-    save_mask_in_disk(output_image, output_filename)
+    save_mask_in_disk(reconstructed_image, output_filename)

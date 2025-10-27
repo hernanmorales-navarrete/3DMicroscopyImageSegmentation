@@ -57,6 +57,14 @@ INTENSITY_PARAMS = {
 RANDOM_SEED = 42
 AVAILABLE_MODELS = ["UNet3D", "AttentionUNet3D"]
 AVAILABLE_AUGMENTATIONS = ["NONE", "STANDARD", "OURS"]
+AVAILABLE_CLASSICAL_METHODS = ["otsu", "adaptive_gaussian", "adaptive_mean", "frangi"]
+AVAILABLE_METRICS = [
+    "accuracy",
+    "precision",
+    "recall",
+    "sensitivity",
+    "specificity",
+]
 
 # Training hyperparameters
 LEARNING_RATE = 1e-5
@@ -83,9 +91,6 @@ METRICS = ["accuracy"]
 # Tensorboard
 TENSORBOARD_UPDATE_FREQ = "epoch"
 PROFILE_BATCH = 0  # Disable profiling
-
-# Available classical methods
-CLASSICAL_METHODS = ["otsu", "adaptive_gaussian", "adaptive_mean", "frangi"]
 
 # Visualization settings
 METHOD_ORDER = [
