@@ -1,3 +1,15 @@
+## 🚨 Deprecated - Use V2 Instead
+
+This repository is no longer maintained. Please use the new version:
+
+**[3DMicroscopyImageSegmentationV2](https://github.com/BioDecodingLab/3DMicroscopyImageSegmentationV2)**
+
+V2 features:
+- Simplified CLI (1 argument instead of 5-6)
+- Clean code architecture
+- Parallel processing
+- Full documentation
+---
 # 3D Microscopy Image Segmentation
 
 This software provides tools for training and evaluating 3D microscopy image segmentation models using both classical and deep learning approaches.
